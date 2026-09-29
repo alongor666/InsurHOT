@@ -1,6 +1,11 @@
 # InsurHOT Phase 0 Architecture & Product Specification
 
-- 版本：Phase 0 / v0.1（2026-09-29）
+> **InsurHOT — Insurance High-value Observed Trends**
+> 保险行业高价值变化与趋势情报平台
+> *Discover what matters, what changes, and what emerges in insurance.*
+> 发现保险行业什么重要、什么正在变化、什么正在诞生。
+
+- 版本：Phase 0 / v0.2（2026-09-29；v0.2 按 owner 确认的 P0 定位做了增量校准，见 [定位校准记录](positioning-delta-review.md)）
 - 状态：Draft，供决策评审；不含实现
 - 基线：AIHOT `589f79e`（MIT，2026-09-29 开源快照）
 - 配套附录：
@@ -32,7 +37,7 @@
 15. AI Insurance Business Model Taxonomy
 16. Business Model Innovation Criteria
 17. New Species Schema
-18. Hot Score vs Change Score
+18. Hot Score vs Change Score（及三支柱信号）
 19. AI Pipeline
 20. Evidence / Provenance Architecture
 21. Data Architecture
@@ -55,6 +60,14 @@
 ---
 
 ## 1. Executive Summary
+
+**定位（owner 已确认，P0 上位约束，见 §3 C0）。** InsurHOT 中的 **HOT = High-value Observed Trends**，不是"热门新闻"。产品要回答的不是 *What is hot?*，而是三个问题：
+
+- **What matters?** 什么重要；
+- **What is changing?** 什么正在变化；
+- **What is emerging?** 什么正在诞生。
+
+本规格中，这三个问题分别由 Importance、Change、Emergence 三类信号和对应视图承担；热度（Attention，技术名沿用 Hot Score）只是辅助信号（§18）。
 
 **问题。** 保险行业的公开信息分散在监管机构、行业协会、数百家保险公司的信息披露栏目、条款 PDF、财报和各国媒体里。现有产品各自只解决了一段：
 
@@ -89,7 +102,12 @@
 5. **AI Business Model Radar 以"New Species 登记簿"的形式进 MVP**，人工策展为主。附录 C 已经完成 58 个案例的初步编码，冷启动成本低，法律风险低，差异化最强。
 6. **不建图数据库**。V1 用 PostgreSQL 关系模型表达"图形状"的实体关系；只有在出现 ≥3 类必需的多跳查询、且关系模型性能不足时（最早 Phase 3），才考虑 graph 化。
 7. **中国与全球用一套核心模型，信源、分类映射、险种 schema 按法域分层扩展**，而不是两套系统。
-8. **Hot Score 继承并重新校准；Change Score 新建**。Change Score 从确定性规则起步：监管生效、条款版本 diff、实体首次出现。
+8. **三支柱信号：Matters / Changes / Emerges**。
+   - Importance 由 AIHOT 的双评分机制改造而来，衡量重要性，不衡量热度；
+   - Change Score 新建，从确定性规则起步：监管生效、条款版本 diff、实体状态变化；
+   - Emergence 新建：首次出现、扩散阶段、New Species。
+
+   Hot Score 保留为关注度（Attention）辅助信号，继承后重新校准，不作为首页主轴。
 9. **护城河**：随时间累积的版本化结构数据（首次发现时间、变更史），加上公开方法的公信力与不收佣的独立性，再加上评测金标集。聚合层本身没有壁垒：已有人基于 AIHOT 做出了金融/保险方向的 `finhot` [B§2.14]。
 10. **只能做三件事时**：
     1. 证据优先的采集内核 + 实体注册表；
@@ -100,13 +118,21 @@
 
 ## 2. InsurHOT 一句话定义
 
+**正式品牌定义（owner 已确认）**
+
+- **InsurHOT = Insurance High-value Observed Trends**
+- 中文：**保险行业高价值变化与趋势情报平台**
+- Mission：*Discover what matters, what changes, and what emerges in insurance.*（发现保险行业什么重要、什么正在变化、什么正在诞生。）
+
+**展开定义**（Phase 0 规划使用的工作定义，与品牌定义一致）：
+
 > **InsurHOT 是一个独立、证据可追溯、面向人和 AI Agent 的保险行业公共情报基础设施：它持续把全球公开的保险信息转化为可验证的事件、实体、产品事实与结构性变化，并用公开的方法对它们进行解释与评价。**
 
 英文：*InsurHOT is independent, evidence-traceable public intelligence infrastructure for the insurance industry, for humans and AI agents.*
 
 它**不是**：
 
-- 保险新闻聚合站；
+- 保险热点站或保险新闻聚合站。"HOT"指高价值的、可观察的趋势，不指热门；
 - 保险比价或销售平台；
 - 某家保险公司的经营系统；
 - 投保建议工具。
@@ -116,6 +142,29 @@
 ## 3. Product Constitution
 
 以下条款是项目宪法，优先级高于任何功能需求。与宪法冲突的需求默认拒绝，除非走 ADR 修宪流程（§34）。
+
+### C0 定位与使命（owner 已确认的 P0 上位约束，ADR-023）
+
+C0 由 owner 冻结。C1–C7 与本规格其余部分都服从 C0；本规格的任何修订都不得改变 C0，修改 C0 只能由 owner 发起。
+
+1. **品牌**：InsurHOT = **Insurance High-value Observed Trends**，保险行业高价值变化与趋势情报平台。"HOT"正式定义为 High-value Observed Trends，**不再仅表示热门新闻**。
+2. **使命**：*Discover what matters, what changes, and what emerges in insurance.* 发现保险行业什么重要、什么正在变化、什么正在诞生。
+3. **三个问题 → 三类产品能力**：
+
+   | 问题 | 含义（owner 定义） | 本规格中的承载 |
+   |---|---|---|
+   | **What matters?** | 识别真正重要的保险行业事件、监管变化、产品与市场信号，而不是简单追逐新闻热度 | Importance 信号（§18、§19.3）；"重要"视图；日报的重要事件节 |
+   | **What is changing?** | 发现产品、风险、监管、市场结构、技术和商业模式正在发生的实质性变化 | Change 检测器与 Change Score（§18）；监管追踪；产品版本 diff |
+   | **What is emerging?** | 发现尚未成为行业共识的新产品、新风险、新技术应用，尤其是 AI 驱动的新保险商业模式和"保险新物种" | Emergence 信号与扩散阶段（§18）；New Species 登记簿（§15–§17） |
+
+   热度（*What is hot?*）不是产品目标，只作为辅助的关注度信号（Attention）。
+4. **Evidence first, opinion last**（展开见 C1）。
+5. **客观不等于不评价**：InsurHOT 可以建立保险产品评价体系，但必须**先**建立公开、统一、可解释、可复算、证据可追溯的评价标准（展开见 C2、§13）。**Product Benchmark 是重要能力。**
+6. **AI 驱动的新保险商业模式（Business Model Radar / New Species）是最高优先级研究方向之一**（§15–§17）。
+7. **边界**：
+   - InsurHOT 不是任何一家保险公司的内部经营系统；
+   - 不研究各保险公司的内部渠道经营、内部费用政策、内部客户或经营数据；
+   - 面向整个保险行业的公开信息空间（展开见 C4、§28 N1–N3）。
 
 ### C1 Evidence First, Opinion Last
 
@@ -187,7 +236,7 @@
 
 ### 4.2 V1 核心场景（Jobs to be Done）
 
-1. **晨读**：从业者 5 分钟看完"昨日重要变化"。内容包括监管发布与生效、重要公司事件、新产品或条款变化、新物种，每条可点到一手原文。
+1. **晨读**：从业者 5 分钟看完昨天**什么重要、什么在变、什么在诞生**。内容包括重要事件、监管发布与生效、新产品或条款变化、新风险与新物种，每条可点到一手原文。
 2. **追踪一个实体**：看某保险公司或监管机构的时间线，包括事件、公告、处罚、产品上下架、AI 动作。
 3. **监管变化追踪**：某法域在某险种上，征求意见 → 发布 → 生效 → 执法的全链路。
 4. **判断一个"AI 保险新公司"是不是新物种**：查它的 Business Model Card，看它在 14 个变量上的证据与分级。
@@ -239,13 +288,14 @@
 | 原件快照与归档 | 仅存正文文本与 revision | **New** | 证据需要不可变快照（C1） |
 | Deduplication | URL 规范化 identity + content_hash revision；同事件由归组处理 | **Inherit + Adapt** | 增加文档级哈希去重（同一 PDF 多处转载）；监管文件以"文号"为强身份键 |
 | Prefilter | 宽召回 PASS/BLOCK/UNKNOWN | **Adapt** | 改写为"保险相关性"；UNKNOWN 继续放行的规则保留 |
-| Scoring（双次独立评分 + 按 tier 阈值） | `selection-score.md` 五轴加权 | **Adapt** | 保留"评分不看来源、阈值按 tier"的解耦与双评分；**重写五轴与内容类型**（见 §19.3）；必须用保险金标集重新校准阈值（F-08） |
+| Scoring（双次独立评分 + 按 tier 阈值） | `selection-score.md` 五轴加权 | **Adapt** | 保留"评分不看来源、阈值按 tier"的解耦与双评分；**重写五轴与内容类型**（见 §19.3）；必须用保险金标集重新校准阈值（F-08）；**评分语义从"注意力"改为"重要性"（Importance，承载 What matters?）** |
 | Summarization / writing | understand / summarize 分流；防幻觉规则；identity guard | **Adapt** | 防幻觉规则直接继承；identity guard 改为基于实体注册表，不再用正则字典；增加"认知状态"标注 |
 | Structure extraction | 单一 category + tags + subjects + 自由文本 fact | **Replace** | 改为多 facet（domain/line/jurisdiction/entity/event_type）+ 断言抽取，主体链接到实体 ID |
 | Event clustering（stories/facts） | embedding 召回 + 三分类关系 + 跨厂商复核 + 人工覆盖 | **Inherit + Adapt** | 算法继承；fact 增加 `event_type`、实体角色、法域；召回窗口从 14 天按事件类型可调（监管事件周期长） |
-| Hot Score | 48h 窗口、独立参与者、24h 半衰、≥2 参与者 | **Adapt** | 窗口与门槛按信源密度重新校准；只作为"关注度"信号，与 Importance、Change 分离（§18） |
-| Change Score | 无 | **New** | §18 |
-| 日报/周报/月报 | `reports/compose.ts` + 修订 | **Adapt** | 报告结构改为"变化优先"：监管 / 公司 / 产品 / 新物种 / 数据；每条带证据 |
+| Hot Score | 48h 窗口、独立参与者、24h 半衰、≥2 参与者 | **Adapt** | 窗口与门槛按信源密度重新校准；只作为"关注度"（Attention）辅助信号，与 Importance、Change、Emergence 分离（§18）；技术名沿用 Hot Score，对外称"关注度"，避免与品牌中的 HOT（High-value Observed Trends）混淆 |
+| Change Score | 无 | **New** | §18（承载 What is changing?） |
+| Emergence（首次出现、扩散阶段） | 无 | **New** | §18（承载 What is emerging?） |
+| 日报/周报/月报 | `reports/compose.ts` + 修订 | **Adapt** | 报告结构按三支柱组织：**重要（Matters）/ 变化（Changes）/ 新生（Emerges）**，节内再按监管、公司、产品、新物种、数据细分；每条带证据；关注度不单独成节 |
 | Topics（company/field/genre） | `topics.json` 静态目录 | **Replace** | 由实体注册表和 taxonomy 自动生成实体页与主题页 |
 | RSS | 精选/全部/全文/日报/分类 | **Inherit + Adapt** | 增加法域 × 领域 × 实体的订阅；全文 RSS 仍只对明确授权来源开放 |
 | Public API v1 | items/hot-topics/stories/dailies/selected snapshot+changes | **Inherit + New** | 保留并扩展资源类型（§22） |
@@ -269,10 +319,11 @@
 | Entity Registry | 保险机构、监管机构、产品、人物、技术等实体的主数据与别名 | Phase 1 |
 | Source Registry 2.0 | 权威性、独立性、法域、许可、纠错史 | Phase 1 |
 | Regulatory Tracker | 监管文件生命周期：征求意见 → 发布 → 生效 → 执法 | Phase 1 |
-| Change Detection Engine | 结构性变化识别与 Change Score | Phase 1（规则）/ Phase 2（模型辅助） |
-| New Species Registry | AI 保险商业模式卡与分级 | Phase 1（人工策展） |
+| Change Detection Engine | 结构性变化识别与 Change Score（Changes） | Phase 1（规则）/ Phase 2（模型辅助） |
+| Emergence Tracking | 首次出现、扩散阶段与行业共识判断（Emerges） | Phase 1（首次出现 + 阶段标注）/ Phase 2（扩散计数） |
+| New Species Registry | AI 保险商业模式卡与分级（最高优先级研究方向之一，C0.6） | Phase 1（人工策展） |
 | Product Registry & Version Diff | 产品身份、版本、条款变化 | Phase 2 |
-| Product Benchmark Engine | 多维分数卡、Profile、被占优检测 | Phase 2（方法 + 内部）/ 法律意见后公开 |
+| Product Benchmark Engine | 多维分数卡、Profile、被占优检测（重要能力，C0.5；先标准后评价） | Phase 1（标准、schema、方法 RFC）/ Phase 2（内部评分）/ 法律意见后公开 |
 | AI Maturity Tracker（中国/亚洲） | 外部视角的保险公司 AI 成熟度 | Phase 2 |
 | Corrections & Disputes | 公开更正通道与处理记录 | Phase 1 |
 
@@ -288,6 +339,7 @@
             ├─────────── WHERE（法域 jurisdiction）
             └─────────── WHICH LINE（险种 line_of_business）
             + WHEN（发生/公布/生效三种时间） + HOW SURE（认知状态 + 证据等级）
+            + WHY IT MATTERS（三支柱信号：Importance / Change / Emergence；Attention 仅辅助）
 ```
 
 ### 7.1 内容单元的层次（从原料到结论）
@@ -300,12 +352,12 @@
 | L3 事件 | Event（AIHOT 的 fact/story） | 一次真实发生及其直接进展 | 是 |
 | L4 实体 | Entity | 公司、监管机构、产品、人物、技术、险种、法域 | 是（实体页） |
 | L5 结构化对象 | Product Version / Regulation / Business Model Card | 有 schema 的领域对象 | 是 |
-| L6 评价 | Benchmark Scorecard / BM Level / Change Score / Hot | 引用断言的方法化评价 | 是（带方法版本） |
+| L6 评价 | Importance / Change Score / Emergence Stage / Benchmark Scorecard / BM Level；Attention（Hot）为辅助 | 引用断言的方法化评价 | 是（带方法版本） |
 | L7 成刊 | Daily / Weekly / Monthly / 专题 | 编辑成品 | 是 |
 
 ### 7.2 核心信息路径
 
-1. **"今天有什么变化？"**：首页 → 变化流（按 Change Score）+ 热点（按 Hot）→ 事件页 → 证据原文。
+1. **"今天什么重要、什么在变、什么在诞生？"**：首页三栏（重要 / 变化 / 新生）→ 事件页 → 证据原文。关注度榜只作辅助入口。
 2. **"这家公司最近怎么样？"**：搜索或实体页 → 时间线（事件/公告/处罚/产品/AI 动作）→ 事件页 → 证据。
 3. **"这条监管规定到哪一步了？"**：监管页（按法域）→ 监管对象页（生命周期 + 版本 diff + 关联事件）→ 原文。
 4. **"这是不是新物种？"**：New Species → 商业模式卡（14 变量 + 分级 + 证据）→ 相似公司 → 相关事件。
@@ -319,7 +371,8 @@
 ### 8.1 设计原则
 
 - **Facet 而非单一分类**。一条"某保险公司因健康险销售误导被罚"同时属于：监管执法（domain）、处罚（event_type）、某公司（entity）、中国（jurisdiction）、健康险（line）。AIHOT 的单 category（F-05）不足以表达。
-- **Hot 不是分类**。热点是排序视图，不是内容类别。候选分类中的"Hot"不作为一级领域。
+- **Hot 不是分类**。热点是排序视图，不是内容类别。候选分类中的"Hot"不作为一级领域。品牌中的 HOT 是 High-value Observed Trends，不是"热门"。
+- **Matters / Changes / Emerges 也不是分类**。它们是三支柱**信号与视图**（§18），可以作用于任何 domain、险种和法域的内容，所以不进入 taxonomy 的分类键。
 - **"AI & New Models"拆成两件事**：技术应用（domain = Technology）是资讯；新商业模式（New Species）是一个结构化登记簿，不是资讯分类。
 - **"Risk"要区分**：作为保险标的的风险（巨灾、气候、网络、AI 风险、疫情，属于 domain = Risk & Catastrophe），与保险公司自身的经营风险（偿付能力、评级下调，属于 domain = Market & Company）。
 - **分类键上线后不改**（继承 AIHOT 规则）；各法域的官方险种代码通过映射表对齐，而不是改内部键。
@@ -332,7 +385,7 @@
 | `enforcement` | 执法与处罚 | 行政处罚、监管函、牌照吊销、禁业、诉讼判决（行业性案例） | 一般纠纷 |
 | `company` | 公司与市场 | 业绩、偿付能力与评级、资本运作、并购、股权与人事、市场进入与退出、经营战略 | 产品细节（见 `product`） |
 | `product` | 产品与保障 | 新产品、条款或费率变化、停售、新保障责任、行业示范条款与标准定义 | 纯营销 |
-| `distribution` | 渠道与交易 | 销售、中介、嵌入式、互联网平台、银保、代理人、费用与佣金规则（公开层面）、Agent 交易 | 单家公司内部渠道经营（Non-goal） |
+| `distribution` | 渠道与交易 | 销售与中介的公开监管规则、嵌入式、互联网平台、银保、代理人制度、监管层面的费用与佣金规则（如"报行合一"等公开监管要求）、Agent 交易 | 任何公司的内部渠道经营、内部费用政策、内部客户或经营数据（C0.7、Non-goal N2/N3） |
 | `claims_service` | 理赔、服务与消费者 | 理赔实践、消费者保护、投诉数据、服务评价公开数据 | —— |
 | `risk` | 风险与巨灾 | 巨灾事件与损失估计、气候、网络、AI 风险、健康与疫情、新兴风险、保障缺口 | —— |
 | `capital` | 再保险与资本 | 再保险续转、ILS/巨灾债券、侧挂、资本市场 | —— |
@@ -504,7 +557,11 @@ Event:
   first_seen: {at, source_id, document_id}
   status: active | watching | settled  # 继承 AIHOT
   relations: [{event_id, type: storyline|related|supersedes|implements|enforces}]
-  scores: {hot: {value, rule_version}, change: {value, rule_version, reasons[]}, importance?}
+  scores:                             # 三支柱信号 + 辅助关注度（§18）
+    importance: {value, rule_version, reasons[]}            # What matters?
+    change: {value, rule_version, reasons[]}                # What is changing?
+    emergence: {stage, first_seen, adopters, rule_version}  # What is emerging?
+    attention: {value, rule_version}                        # 原 hot（辅助，不作主排序）
   epistemic_summary: {primary_sources, independent_sources, disputed: bool}
   digest: {text, version, inputs_hash}   # 继承 story_digests
 ```
@@ -645,6 +702,8 @@ Layer 2 的每个险种有独立的扩展字段、维度分类（O/S/N）和可�
 
 ### 13.1 设计结论
 
+**Product Benchmark 是 InsurHOT 的重要能力（C0.5）。** 评价的前提是先有公开、统一、可解释、可复算、证据可追溯的标准：本章的方法版本化、证据链和 O/S/N 分类，都是在落实"先标准，后评价"。
+
 **不做单一产品总分，也不做总榜。** 采用"**多维分数卡 + 公开命名 Profile 下的可选综合分 + 门槛红旗 + 同类可比集合 + 被占优检测**"。
 
 这个结论有三方面依据 [D§0, §1.2]：
@@ -733,6 +792,8 @@ Evidence（条款 PDF / 费率表 / 法定披露）
 
 ### 14.1 原则
 
+**术语说明**：本章的 "Hot" 是 owner 在 Phase 0 任务中指定的技术名，含义是**关注度（Attention）**，与品牌中的 HOT（High-value Observed Trends）无关。对外界面和 API 字段使用"关注度 / attention"。
+
 **Popularity ≠ Quality ≠ Value。** Product Hot Score 只回答"市场在多大程度上关注这个产品"，**永不进入 Benchmark 分数**。它在页面上放在单独的面板里，并注明"不代表产品质量"。
 
 ### 14.2 信号评估
@@ -769,6 +830,8 @@ w_tier 的作用是降低 T6 和 S 层的权重，**不是**为 T0 加分：热�
 完整案例与文献见 [附录 C](research/ai-business-models.md)，包括 58 个案例表、失败案例库和学术框架综述。
 
 ### 15.1 研究结论
+
+AI 驱动的新保险商业模式是 InsurHOT 的**最高优先级研究方向之一**（C0.6），也是 *What is emerging?* 的核心承载。
 
 1. **大多数"AI-native"公司处在 L2（核心流程自动化）**，AI 可验证的作用集中在成本结构上。例如：
    - Lemonade 的 LAE 比率从 13% 降到 5%，约 55% 理赔自动化；
@@ -967,7 +1030,20 @@ BusinessModelCard:
 
 ---
 
-## 18. Hot Score vs Change Score
+## 18. Hot Score vs Change Score（及三支柱信号）
+
+### 18.0 三支柱信号总览（按 C0 校准）
+
+InsurHOT 的排序和视图由三个主信号驱动，分别回答 C0 的三个问题；Hot Score 降为辅助信号：
+
+| 信号 | 回答 | 衡量什么 | 主要输入 | 方法 | 主要承载 |
+|---|---|---|---|---|---|
+| **Importance** | What matters? | 对保险经营、合规、消费者权益与市场结构的实质份量 | 保险版五轴评分（sig、nov、cred、reson、impact，§19.3）、证据等级、影响面（受影响的险种保费占比、实体份额） | 双评分（继承 AIHOT 机制）+ 规则加成（如 T0 生效文件） | "重要"视图；日报的重要事件节；精选 |
+| **Change** | What is changing? | 与此前状态相比的实质变化 | 检测器 D1–D3、D5、D6、D8（§18.2） | 规则为主，模型辅助解释 | "变化"视图；监管追踪；产品版本 diff |
+| **Emergence** | What is emerging? | 尚未成为行业共识的新事物，以及它处在扩散的哪个阶段 | 检测器 D4（首次出现）、D7（扩散），New Species 候选，`risk.emerging_risk` 等事件 | 规则 + 人工判定（BM 判级只由人完成） | "新生"视图；New Species 登记簿 |
+| Attention（技术名 Hot Score） | What is hot?（辅助） | 被多少独立来源关注 | 独立参与者、时间衰减（§14、AIHOT heat-v1） | 确定性 | 关注度榜（辅助入口）；Importance 的弱输入之一 |
+
+**规则**：Attention 可以作为 Importance 的弱输入（权重上限在方法页公开），但不能单独决定"重要"；四个信号互不替代，也都不进入 Benchmark 分数。
 
 ### 18.1 区别
 
@@ -982,33 +1058,49 @@ BusinessModelCard:
 | 典型例子 | 某公司高管被带走（高 Hot、低 Change） | 某规范性文件把某险种的等待期上限从 90 天改为 30 天（低 Hot、高 Change） |
 | 是否需要模型 | 不需要（确定性） | 规则为主，模型辅助解释 |
 
-**两者都值得建设。** 保险行业里最重要的信息，往往是没人讨论的规则和条款变化；最热的信息，往往是人事和八卦。只做 Hot，InsurHOT 会退化成保险新闻站（§3 的产品最大风险）；只做 Change，又会失去"今天大家在关注什么"的入口。
+**两者都值得建设，但 Hot 只是辅助。** 保险行业里最重要的信息，往往是没人讨论的规则和条款变化；最热的信息，往往是人事和八卦。只做 Hot，InsurHOT 会退化成保险新闻站，这与 C0 对 HOT 的定义（High-value Observed Trends）相悖；Hot 保留为"今天大家在关注什么"的辅助入口。
 
-### 18.2 Change 的类型（检测器）
+### 18.2 检测器（Change 与 Emergence）
 
-| 检测器 | 对象 | 方法 | 阶段 |
-|---|---|---|---|
-| D1 监管生命周期 | Regulation | 确定性：consultation → issued → effective → amended/repealed；生效与截止日历 | Phase 1 |
-| D2 监管文本 diff | Regulation 版本（征求意见稿 vs 正式稿；新旧规定） | 文本对齐 diff + 模型摘要"实质变化"（引用条款） | Phase 1 |
-| D3 实体状态 | Organization | 确定性：牌照、控股、偿付能力等级跨阈值、评级变动、市场进入/退出 | Phase 1 |
-| D4 首次出现 | Event type、险种 × 法域、BM 形态、保障责任代码 | 确定性：词表中"首次在某法域/险种出现"；新实体类型 | Phase 1 |
-| D5 指标突变 | 统计序列（NFRA 月度、投诉通报、红利实现率） | 统计：同比/环比 z-score、结构断点 | Phase 1–2 |
-| D6 产品版本 diff | ProductVersion | 字段级 diff（UIPS）：责任增减、等待期、免赔、续保措辞 | Phase 2 |
-| D7 扩散 | 新保障责任或新形态被跟随 | 首次出现之后 N 天内的跟随者计数 | Phase 2 |
-| D8 BM 级别变化 | BusinessModelCard | L/A 级变化、失败标记 | Phase 1（人工） |
+| 检测器 | 支柱 | 对象 | 方法 | 阶段 |
+|---|---|---|---|---|
+| D1 监管生命周期 | Change | Regulation | 确定性：consultation → issued → effective → amended/repealed；生效与截止日历 | Phase 1 |
+| D2 监管文本 diff | Change | Regulation 版本（征求意见稿 vs 正式稿；新旧规定） | 文本对齐 diff + 模型摘要"实质变化"（引用条款） | Phase 1 |
+| D3 实体状态 | Change | Organization | 确定性：牌照、控股、偿付能力等级跨阈值、评级变动、市场进入/退出 | Phase 1 |
+| D4 首次出现 | **Emergence** | Event type、险种 × 法域、BM 形态、保障责任代码 | 确定性：词表中"首次在某法域/险种出现"；新实体类型 | Phase 1 |
+| D5 指标突变 | Change | 统计序列（NFRA 月度、投诉通报、红利实现率） | 统计：同比/环比 z-score、结构断点 | Phase 1–2 |
+| D6 产品版本 diff | Change | ProductVersion | 字段级 diff（UIPS）：责任增减、等待期、免赔、续保措辞 | Phase 2 |
+| D7 扩散 | **Emergence** | 新保障责任、新形态、新风险被跟随 | 首次出现之后 N 天内的跟随者计数 | Phase 2 |
+| D8 BM 级别变化 | Change（新卡登记属于 Emergence） | BusinessModelCard | L/A 级变化、失败标记 | Phase 1（人工） |
 
 ### 18.3 Change Score（v0，待校准）
 
 ```
 Change(x) = Σ_k  s_k · m_k · a_k · c_k
-  s_k 结构性权重：检测器类型的先验（D1 生效 > D2 实质修订 > D4 首次出现 > D5 指标突变 > D3 人事）
+  s_k 结构性权重：检测器类型的先验（D1 生效 > D2 实质修订 > D6 条款变化 > D5 指标突变 > D3 人事）
   m_k 幅度：diff 的规模（条款变动比例、阈值跨越幅度、z-score）
   a_k 影响面：受影响的险种保费占比 / 实体市场份额 / 法域规模（公开统计）
   c_k 置信度：证据等级 × 抽取置信度（T0–T2 且规则检测 = 1.0；模型解释 ≤ 0.8）
 输出：值 + reasons[]（每个 reason 引用断言与 diff）+ rule_version
 ```
 
-Change 的第一目标是**可解释**（给出 reasons），不是排序精度。日报的首节按 Change 排序，Hot 作为第二入口。
+Change 的第一目标是**可解释**（给出 reasons），不是排序精度。首页和日报按三支柱分节（重要 / 变化 / 新生），各节按对应信号排序；关注度（Hot）只作为辅助入口。
+
+### 18.4 Emergence（v0）：从首次出现到行业共识
+
+"尚未成为行业共识"必须可操作化。每个"新事物"对象（新保障责任代码、新产品形态、新风险类型、新技术应用、BM 形态或卡片）都维护一个**扩散阶段**：
+
+| 阶段 | 定义（v0，阈值待校准） | 证据要求 |
+|---|---|---|
+| `weak_signal` | 只有单一来源或单一主体提及；或者只有 T5/T6 报道 | 至少 1 条断言 |
+| `emerging` | 至少 1 个 T0–T2 一手证据（如备案条款、法定披露、监管文件）确认它真实存在，且采用者（独立主体）≤ N₁ | 一手证据 |
+| `spreading` | 在首次出现后的观察窗口内，独立采用者数超过 N₁，或跨出首个法域或险种 | 采用者清单（D7） |
+| `mainstream` | 采用者超过 N₂，或被纳入行业标准、示范条款、监管规定 | 标准或监管证据 |
+
+- **"新生"视图只展示 `weak_signal`、`emerging`、`spreading`**。进入 `mainstream` 后退出"新生"，转由 Change 与 Importance 跟踪。
+- 每个对象记录 `first_seen`（InsurHOT 发现）与 `first_public_evidence`（最早公开证据），与 §17、§20.3 一致。
+- **质量指标：领先时间**，即 InsurHOT 标为 `emerging` 的时间，比它进入 `mainstream` 或被主流专业媒体集中报道的时间早多少（§25.2）。
+- `weak_signal` 阶段的内容必须显式标注认知状态（多为 `claim_self` 或 `fact_reported`），不得表述为已发生的趋势（C1）。
 
 ---
 
@@ -1028,10 +1120,10 @@ Change 的第一目标是**可解释**（给出 reasons），不是排序精度�
 | 6 | Entity extraction & linking | 提及 → entity_id | ●（外部 ID、别名精确匹配） | ● | ● | ●（歧义判定） | | ●（低置信队列） | New |
 | 7 | Fact / Assertion extraction | 文本 → 断言（主谓宾/数值/条件/时间 + 定位） | ●（结构化源，如统计表、处罚表） | ● | | ●（一般资讯） | ○（条款级、监管文本 diff 解释） | ○ | New |
 | 8 | Evidence linking | 断言 → 段落定位；跨来源对齐 | ●（原文字符串匹配校验） | | ● | ○ | | | New |
-| 9 | Selection scoring | 注意力价值 | | | | ●（双评分，继承） | | ○ 金标 | Adapt |
+| 9 | Importance scoring（精选） | 重要性（What matters?） | | | | ●（双评分，继承） | | ○ 金标 | Adapt |
 | 10 | Event clustering | 资料 → fact/story | ●（文号、docId 强身份键） | | ● | ● | ○（跨厂商复核，继承） | ○（人工拆合，继承） | Inherit + Adapt |
-| 11 | Hot Score | —— | ● | | | | | | Adapt |
-| 12 | Change detection | diff、阈值、首次出现 | ● | ● | | ○（解释） | ○（监管实质变化摘要） | | New |
+| 11 | Attention（Hot Score，辅助） | —— | ● | | | | | | Adapt |
+| 12 | Change & Emergence detection | diff、阈值、首次出现、扩散阶段 | ● | ● | | ○（解释） | ○（监管实质变化摘要） | | New |
 | 13 | Product extraction（Phase 2） | 条款 → UIPS 字段 | ●（费率表、表格） | ● | | ● 第一路 | ●（第二路 / 冲突时） | ●（S 维度双人编码） | New |
 | 14 | Business model detection | 资讯 → BM 候选 | | ●（关键词与事件类型触发） | ● | ●（候选打标） | ○（卡片草稿） | **●（判级只由人完成）** | New |
 | 15 | Summary / writing | 标题、摘要、事件综述、日报 | | | | ● | ○（月报、专题） | ○ | Adapt |
@@ -1048,11 +1140,11 @@ Change 的第一目标是**可解释**（给出 reasons），不是排序精度�
 
 ### 19.3 保险版评分标准（`selection-score.md` 改写要点）
 
-保留结构：内容类型 × 五轴加权 × 噪声压制 × 安全边界；模型只输出一个整数分数。替换内容：
+保留结构：内容类型 × 五轴加权 × 噪声压制 × 安全边界；模型只输出一个整数分数。**评分语义从 AIHOT 的"事件注意力"（`attentionScore`）改为"重要性"（`importanceScore`），承载 What matters?**：衡量事件对保险行业的实质份量，不衡量它被讨论得多热。替换内容：
 
 - **读者**：保险从业者、研究者、投资者，注意力有限。
 - **内容类型（7 类）**：`regulatory_change`、`enforcement`、`company_event`、`product_change`、`market_data`、`research_analysis`、`industry_opinion`。
-- **五轴**：沿用 sig（实质份量）、nov（信息增量）、cred（证据强度）、reson（共振面），把 act（可用性）改为 `impact`（对保险经营、合规或消费者权益的直接影响面）。
+- **五轴**：沿用 sig（实质份量）、nov（信息增量）、cred（证据强度）、reson（共振面），把 act（可用性）改为 `impact`（对保险经营、合规或消费者权益的直接影响面）。reson 在这里指"与保险从业者和研究者的相关度"，不是传播热度；讨论量不进入评分输入（输入本来就不含来源信息，继承 AIHOT）。
 - **必须正常评价**：
   - 监管正式发布、生效，征求意见截止；
   - 行业标准定义与示范条款变化；
@@ -1161,7 +1253,9 @@ Assertion ─< AssertionEvidence(passage_id, relation: supports|contradicts|ment
 |---|---|---|
 | Items | `GET /api/v1/items`（继承；新增 `domain`、`line`、`jurisdiction`、`entity` 过滤） | 资讯 |
 | Events | `GET /api/v1/events?type=&jurisdiction=&line=&entity=&since=` · `GET /api/v1/events/{id}` | 替代并兼容 `stories` |
-| Hot | `GET /api/v1/hot-topics`（继承） | —— |
+| Importance | `GET /api/v1/matters?window=&domain=&jurisdiction=` | 重要事件（What matters?），按 Importance 排序 |
+| Emerging | `GET /api/v1/emerging?stage=&kind=&jurisdiction=` | 新生事物及其扩散阶段（What is emerging?） |
+| Attention | `GET /api/v1/hot-topics`（继承；字段语义为关注度，响应中注明"不代表重要性"） | 辅助 |
 | Changes | `GET /api/v1/changes?since=&detector=&jurisdiction=&min_score=` | 变化流 |
 | Entities | `GET /api/v1/entities?q=&type=&jurisdiction=` · `GET /api/v1/entities/{id}` · `GET /api/v1/entities/{id}/timeline` · `GET /api/v1/entities/{id}/relations` | 实体主数据 |
 | Regulations | `GET /api/v1/regulations?jurisdiction=&status=&line=` · `GET /api/v1/regulations/{id}`（含 lifecycle、versions、diff） | 监管跟踪 |
@@ -1193,7 +1287,10 @@ Assertion ─< AssertionEvidence(passage_id, relation: supports|contradicts|ment
 
 | 工具 | 用途 | 来源 |
 |---|---|---|
-| `insurhot_get_latest` / `insurhot_search` / `insurhot_get_hot` / `insurhot_get_daily` | 资讯与热点 | 继承 |
+| `insurhot_get_latest` / `insurhot_search` / `insurhot_get_daily` | 资讯与日报 | 继承 |
+| `insurhot_get_matters` | 重要事件（What matters?） | 新增 |
+| `insurhot_get_emerging` | 新生事物与扩散阶段（What is emerging?） | 新增 |
+| `insurhot_get_hot` | 关注度榜（辅助；工具说明写明"关注度 ≠ 重要性"） | 继承 |
 | `insurhot_get_event` | 事件、时间线与证据（替代 get_story，保留别名） | 改造 |
 | `insurhot_get_changes` | 某时间以来的结构性变化（可按法域、险种、检测器过滤） | 新增 |
 | `insurhot_get_entity` / `insurhot_entity_timeline` | 实体主数据与时间线 | 新增 |
@@ -1209,7 +1306,7 @@ MCP 工具描述沿用 AIHOT 的防误用写法，例如"只使用本工具返�
 
 继承精选、全部、全文、日报等订阅，新增：
 
-- `/feed/changes.xml`
+- `/feed/matters.xml`、`/feed/changes.xml`、`/feed/emerging.xml`（三支柱）
 - `/feed/regulation/{jurisdiction}.xml`
 - `/feed/entity/{id}.xml`
 - `/feed/species.xml`
@@ -1231,7 +1328,7 @@ MCP 工具描述沿用 AIHOT 的防误用写法，例如"只使用本工具返�
 ┌─────────────── 全球共享核心（一套）────────────────┐
 │ Entity / Document / Assertion / Evidence / Event   │
 │ 事件类型词表 · Domain · Line 内部键 · UIPS-Core     │
-│ Hot/Change 引擎 · API/MCP · 方法论治理             │
+│ 三支柱信号引擎 · API/MCP · 方法论治理             │
 └───────────────────────────────────────────────────┘
       │ 法域扩展包（Jurisdiction Pack，每个法域一个）
       ├─ sources（信源与适配器，含 reuse_class）
@@ -1271,7 +1368,7 @@ MCP 工具描述沿用 AIHOT 的防误用写法，例如"只使用本工具返�
 
 | 层 | 模型档位 | 任务 | 说明 |
 |---|---|---|---|
-| **R0** | 无模型 | 结构化源解析、去重、文号/docId 归组、Hot、Change D1/D3/D4/D5、许可执行 | 目标：V1 中至少 40% 的一手信源条目完全不经过 LLM |
+| **R0** | 无模型 | 结构化源解析、去重、文号/docId 归组、Attention（Hot）、Change D1/D3/D5、Emergence D4、许可执行 | 目标：V1 中至少 40% 的一手信源条目完全不经过 LLM |
 | **R1** | Flash/小模型（AIHOT 默认档：DeepSeek、GLM、Qwen、MiMo 的 flash 型号） | prefilter、分类、短摘要、实体歧义判定、BM 候选打标、双评分 | cheap-first；同一 prompt 跑两次，一致则通过（沿用 AIHOT 的双评分思想） |
 | **R2** | 中档（带推理的 flash 或中型模型） | 断言抽取、事件归组关系判定、事件综述、日报 | 归组复核继承"换一家厂商" |
 | **R3** | 强模型 | 监管文本实质变化摘要、条款级 UIPS 抽取的第二路与冲突裁决、BM 卡片草稿、月报与专题 | 只在升级条件触发时，或任务本身价值高时使用 |
@@ -1326,6 +1423,7 @@ R3 仍不一致或低置信 ─► 人工队列
 | GroupBench | 报道对 → 四分类关系（继承 AIHOT 370 对标注的做法） | 合并查准与查全 | 400 对 | 事件归组 |
 | AssertionBench | 断言 → 是否被引文支持、数值是否正确 | 支持率（faithfulness）、字段准确率 | 300 条断言 | 证据链 |
 | ChangeBench | 文档版本对 → 是否实质变化 + 变化点 | 查准率（首要）、召回率 | 100 对 | Change 检测器 |
+| EmergenceBench | 对象 → 扩散阶段（weak_signal / emerging / spreading / mainstream） | 阶段准确率；`weak_signal` 误升级率 | 100 个对象 | Emergence 阶段判定 |
 | ProductExtractBench（Phase 2） | 条款 → UIPS 字段 | 字段级准确率（O 类目标 ≥ 98%）、κ（S 类） | 每险种 30 份条款 | Benchmark 数据质量 |
 | BM 判级一致性 | 卡片 → L/A/E/D/N | 双人 κ、仲裁率 | 58 张冷启动卡 | New Species 方法可靠性 |
 
@@ -1341,6 +1439,7 @@ R3 仍不一致或低置信 ─► 人工队列
 |---|---|
 | 覆盖 | P0 信源健康率；**发现延迟**（最早公开证据 → InsurHOT 发现的中位数）；NFRA 各栏目覆盖率 |
 | 质量 | 更正率（每千条已发布内容）、争议断言占比、人工推翻率、实体链接人工修正率 |
+| 三支柱 | Matters：编辑抽检"重要"视图的查准率；Changes：变化流抽检查准率；Emerges：**领先时间**（标为 `emerging` 的时间比进入 `mainstream` 或被主流专业媒体集中报道早多少） |
 | 证据 | 事实级陈述中 T0–T2 证据覆盖率（目标 ≥ 90%）；`inference_model` 状态内容的占比 |
 | 成本 | 每条已发布资料的成本、升级率、预算触顶次数 |
 | 使用 | 日活读者、日报打开率、API/MCP 调用数与独立客户端数、数据集下载数 |
@@ -1354,8 +1453,8 @@ R3 仍不一致或低置信 ─► 人工队列
 
 | 入口 | 内容 | 说明 |
 |---|---|---|
-| **今日**（首页） | 变化流（Change）+ 热点（Hot）+ 最新日报入口 + 新物种动态 | 首页的主轴是"变化"，不是"新闻" |
-| **事件** | 全部事件；按 domain、法域、险种过滤；热点榜 | 继承 AIHOT 的 /all、/hot、/story |
+| **今日**（首页） | 三栏：**重要**（Matters）/ **变化**（Changes）/ **新生**（Emerges，含新物种动态）+ 最新日报入口；关注度榜为辅助入口 | 首页回答 C0 的三个问题，不是"新闻"，也不是"热点" |
+| **事件** | 全部事件；按 domain、法域、险种过滤；关注度榜（辅助） | 继承 AIHOT 的 /all、/hot、/story；对外标签用"关注度" |
 | **监管** | 按法域；监管日历（征求意见截止 / 发布 / 生效）；监管对象页（生命周期 + diff + 执法） | 新增 |
 | **机构** | 实体目录与实体页（时间线、关系、披露、处罚、AI 动作、关联新物种） | 替代 topics |
 | **新物种** | New Species 登记簿（按 L/A 级、形态、法域）；商业模式卡；方法说明 | 新增 |
@@ -1380,7 +1479,7 @@ R3 仍不一致或低置信 ─► 人工队列
 | # | 风险 | 等级 | 说明 | 缓解 |
 |---|---|---|---|---|
 | R1 | **中国：非保险机构比较保险产品、保费试算、提供产品咨询** | **高** | 《互联网保险业务监管办法》第二十三条、第十五条（四）[D§5.3] | V1 不发布面向中国公众的产品比较或评分；不做试算；不做问答式产品咨询；公开 Benchmark 之前取得持牌律所书面意见（ADR-011） |
-| R2 | **中国：金融产品网络营销** | **高** | 《金融产品网络营销管理办法》2026-09-30 施行。第二条：非金融机构及其非受托平台"不得开展或者变相开展"网络营销，"展示介绍金融产品相关信息"属于营销范畴；第十八、十九条：名称和商标中的"保险"等字样；第二十条：第三方平台不得与消费者就金融产品"互动咨询" [D§5.3] | 不接受保险机构委托或付费；不设投保跳转；内容为新闻与研究，避免"推介"措辞；**中文名称、域名、账号不使用"保险"二字，除非律师确认可以使用**；"InsurHOT"英文名是否构成"涉金融属性字样"——**NEEDS VALIDATION（律师）** |
+| R2 | **中国：金融产品网络营销** | **高** | 《金融产品网络营销管理办法》2026-09-30 施行。第二条：非金融机构及其非受托平台"不得开展或者变相开展"网络营销，"展示介绍金融产品相关信息"属于营销范畴；第十八、十九条：名称和商标中的"保险"等字样；第二十条：第三方平台不得与消费者就金融产品"互动咨询" [D§5.3] | 不接受保险机构委托或付费；不设投保跳转；内容为情报与研究，避免"推介"措辞；**owner 已冻结的中文定位语"保险行业高价值变化与趋势情报平台"含"保险"二字**：它作为定位描述使用时，以及作为网站、APP、账号名称或商标使用时，是否受第十八、十九条约束，**NEEDS VALIDATION（律师）**。在意见出具前，不把含"保险"的字样注册为网站、APP、账号名称或商标，但不改变 owner 的定位（见 Q2 与定位校准记录中的冲突 X-1）；"InsurHOT"英文名同样待律师意见 |
 | R3 | 数据爬取不正当竞争 | 高 | 《反不正当竞争法》（2025 修订）第十三条：不得避开或破坏技术管理措施获取数据，罚款最高 500 万元 [E§14.1] | 采集规则第 2 条（§9.3）；中保协产品库只走授权或人工 |
 | R4 | 中保协披露平台声明禁止下载、数据提取 | 高 | [B§2.8] | 授权谈判；替代路径是保险公司官网的法定公开披露（其可抓取性与再发布的合法性 NEEDS VALIDATION） |
 | R5 | 著作权 | 中 | 媒体作品受保护；合理使用范围有限；欧盟 TDM 的 opt-out；日本 30-4 条不涵盖对外展示 [E§14] | `reuse_class` 由代码强制执行；媒体内容只存摘要、短引用和链接（继承 AIHOT 默认不展示全文） |
@@ -1402,7 +1501,7 @@ R3 仍不一致或低置信 ─► 人工队列
 |---|---|---|
 | N1 | 单一保险公司的内部经营系统或管理工具 | 定位是行业公共情报 |
 | N2 | 接入任何机构的内部经营数据、客户数据、个人信息 | C4 |
-| N3 | 研究不可验证的公司内部渠道策略、费用政策、销售组织 | 只研究公开的交易结构 |
+| N3 | 研究各保险公司的内部渠道经营、内部费用政策、内部客户或经营数据、销售组织 | C0.7；只研究公开的交易结构与公开监管规则 |
 | N4 | 保险销售、导流、比价、保费试算、投保方案设计、产品咨询 | 法律（R1、R2）与独立性（C3） |
 | N5 | 保险销售 CRM、营销获客系统、代理人工具 | 同上 |
 | N6 | 伪装成投保建议；个性化"最适合你"推荐 | 同上 |
@@ -1416,6 +1515,7 @@ R3 仍不一致或低置信 ─► 人工队列
 | N14 | 投资建议、股票推荐 | 实体与商业模式信息不构成投资建议 |
 | N15 | 与付费监管合规产品（CUBE、NILS、Axco）正面竞争深度合规服务 | 只做公开的监管事件流 |
 | N16 | 自由形式的公众 AI 问答（V1） | R9、R12 |
+| N17 | 保险热点站或新闻聚合站；以热度为产品目标 | C0.1、C0.3：HOT = High-value Observed Trends；热度只作辅助信号 |
 
 ---
 
@@ -1484,7 +1584,13 @@ R3 仍不一致或低置信 ─► 人工队列
 
 ### 31.1 MVP 目标
 
-> 证明 InsurHOT 不是保险新闻站。MVP 要做到：每个对外"事实"都能点到一手原文；中国监管变化被系统、及时地捕获并解释；AI 保险商业模式有一套可审计的判定方法和一个可用的登记簿；这三样同时能被 Agent 调用。
+> 证明 InsurHOT 是"高价值变化与趋势情报平台"，不是保险热点站或新闻站。MVP 要对 C0 的三个问题各给出一个可用的最小答案，并且都以证据为先：
+>
+> - **What matters?**：重要性评分（Importance）经保险金标集校准，"重要"视图与日报的重要事件节可用；
+> - **What is changing?**：中国监管变化被系统、及时地捕获并解释（Change v0）；
+> - **What is emerging?**：AI 保险商业模式有一套可审计的判定方法和可用的登记簿，新事物有扩散阶段标注（Emergence v0 + New Species v0）。
+>
+> 每个对外"事实"都能点到一手原文；三类结果都能被 Agent 调用。Product Benchmark 在 MVP 中先完成"标准"（C0.5）。
 
 ### 31.2 范围
 
@@ -1493,11 +1599,11 @@ R3 仍不一致或低置信 ─► 人工队列
 | M0 基线 | 导入 AIHOT `589f79e`；重命名为 `@insurhot/*`；关闭 leaderboard 和 monitor（删除代码）；CI 全绿；安全阀默认关闭 | 追上游 |
 | M1 信源与文档层 | 信源模型 2.0（evidence_tier + 六维度 + reuse_class）；P0 信源约 20 项 [E§16]；documents / versions / passages；PDF/.doc/.wps 解析；原件对象存储 | 中保协产品库批量（需授权）；社交与搜索指数 |
 | M2 实体注册表 | 中国持牌保险机构与主要中介、监管机构（含派出机构层级）、全球头部约 200 家保险/再保/InsurTech；别名与外部标识；实体页 | 人物实体的全面覆盖 |
-| M3 保险化精选 | taxonomy（§8）、prompts 改写（§19.3）、SelectBench-Insur 300 条金标与阈值校准；GroupBench 400 对 | —— |
+| M3 保险化精选 = Importance v0（Matters） | taxonomy（§8）、prompts 改写为重要性评分（§19.3）、SelectBench-Insur 300 条金标与阈值校准；GroupBench 400 对；"重要"视图 | —— |
 | M4 证据层 | 断言抽取（结构化源规则化 + 一般资讯 R1/R2）；原文回查；认知状态；事件页证据展示 | 冲突自动裁决 |
-| M5 监管追踪与 Change v0 | Regulation 对象与生命周期；D1、D2（文本 diff + 解释）、D3、D4、D5（NFRA 统计）；变化流与监管日历；**首个样板：2026《银行保险机构信息披露管理办法》从征求意见到正式稿** | D6、D7（产品） |
-| M6 New Species v0 | BM Card schema；编辑手册（14 变量、L/A/E/D/N、炒作清单）；58 个案例导入，一手复核后上线 ≥20 张 `listed` 卡；双人 κ | 自动判级 |
-| M7 对外出口 | 继承 API/RSS/MCP；新增 events、changes、entities、regulations、species、evidence 等资源与对应 MCP 工具；`llms.txt`；NFRA 处罚数据集 v1 | Benchmark API |
+| M5 监管追踪与 Change v0（Changes）+ Emergence v0（Emerges） | Regulation 对象与生命周期；D1、D2（文本 diff + 解释）、D3、D5（NFRA 统计）；D4 首次出现与扩散阶段标注（§18.4）；变化流、新生视图与监管日历；**首个样板：2026《银行保险机构信息披露管理办法》从征求意见到正式稿** | D6、D7（产品） |
+| M6 New Species v0（Emerges，最高优先级研究方向之一） | BM Card schema；编辑手册（14 变量、L/A/E/D/N、炒作清单）；58 个案例导入，一手复核后上线 ≥20 张 `listed` 卡；双人 κ | 自动判级 |
+| M7 对外出口 | 继承 API/RSS/MCP；新增 matters、changes、emerging、events、entities、regulations、species、evidence 等资源与对应 MCP 工具；`llms.txt`；NFRA 处罚数据集 v1 | Benchmark API |
 | M8 Benchmark 地基（内部） | UIPS-Core + 医疗险 L2 schema；编码手册 v0；方法论 RFC v0（公开征求意见）；内部原型（窄品类，不公开分数）；**委托律所出具书面意见** | 面向中国公众的分数与比较 |
 | M9 合规与治理 | Non-goals 与方法页；更正通道；许可执行；个人信息最小化；免责声明 | —— |
 
@@ -1510,7 +1616,9 @@ R3 仍不一致或低置信 ─► 人工队列
 | 断言原文回查通过率 | ≥ 97%（抽检 200 条） |
 | SelectBench-Insur（holdout） | 查准率 ≥ 0.85，查全率 ≥ 0.75（初始目标，校准后修订） |
 | 实体链接准确率（EntityBench） | ≥ 0.95 |
-| Change（D1–D5）抽检查准率 | ≥ 0.9 |
+| "重要"视图编辑抽检查准率（Matters） | ≥ 0.85 |
+| Change（D1–D3、D5）抽检查准率（Changes） | ≥ 0.9 |
+| Emergence 阶段判定准确率（EmergenceBench）；`weak_signal` 误升级率 | ≥ 0.85；≤ 5% |
 | New Species `listed` 卡 | ≥ 20 张，双人判级 κ ≥ 0.6 |
 | 更正率 | < 5‰ |
 | 模型成本 | 在预算上限内；R0 条目占比 ≥ 40% |
@@ -1536,7 +1644,7 @@ R3 仍不一致或低置信 ─► 人工队列
 
 ### Phase 2（3–9 个月）：产品层与亚洲
 
-- **Product Registry**：产品身份、版本、字段级 diff（D6）；同类跟随（D7）；Product Hot（§14）。
+- **Product Registry**：产品身份、版本、字段级 diff（D6，Changes）；同类跟随（D7，Emerges）；产品关注度（Product Hot，辅助，§14）。
 - **Benchmark**：在拿到法律意见的前提下，决定公开形态：（a）全面公开分数卡；（b）只公开方法与事实，不公开分数；（c）只做 B2B 研究；并决定是否先用开放数据集（CMS PUF 或 OPIN）做可复现演示。
 - **AI 成熟度追踪（中国与亚洲）**：外部视角，指标逐项带证据，按季度更新。
 - **法域扩展**：中国香港、新加坡（需许可）、日本、韩国。
@@ -1558,7 +1666,7 @@ R3 仍不一致或低置信 ─► 人工队列
 | # | 问题 | 由谁决定 | 截止 |
 |---|---|---|---|
 | Q1 | 在中国发布"产品事实卡、版本 diff、被占优标记、分数卡"，分别是否构成"比较保险产品 / 网络营销 / 咨询"？ | 持牌律所书面意见 | Phase 1 结束前 |
-| Q2 | 品牌：中文名是否可以不含"保险"？"InsurHOT"是否触及《金融产品网络营销管理办法》第十八、十九条？ | 律所 + 创始人 | W2 |
+| Q2 | 品牌合规：owner 已冻结的中文定位语"保险行业高价值变化与趋势情报平台"，以及"InsurHOT"，作为定位描述使用和作为网站、APP、账号名称或商标使用时，是否受《金融产品网络营销管理办法》第十八、十九条约束？（不重新讨论定位本身，只确定合规的使用方式） | 律所 → owner | W2 |
 | Q3 | 运营主体性质（公司、研究机构、非营利）与资金来源，如何满足 C3？ | 创始人 | Phase 1 |
 | Q4 | 中保协产品库与信息披露平台的数据授权是否可能？条件是什么？ | 商务对接 | Phase 2 前 |
 | Q5 | 保险公司官网法定公开披露的条款，能否机器抓取并用于分析和短引用展示？ | 律所 | Phase 2 前 |
@@ -1568,6 +1676,8 @@ R3 仍不一致或低置信 ─► 人工队列
 | Q9 | 数据集的许可（InsurHOT 自产数据用 CC BY 4.0？如何处理源数据的许可叠加？） | 律所 | Phase 1 数据集发布前 |
 | Q10 | 首个 Benchmark 险种选"百万医疗/中端医疗"（监管关键信息清单完整）还是"定期寿险"（有示范条款、结构简单）？ | 产品 + 研究 | Phase 2 开始 |
 | Q11 | NFRA JSON 接口的使用边界（没有 robots、没有文档）：是否需要事先沟通？ | 技术 + 法务 | W2 |
+| Q13 | 技术标识符是否统一改名：`Hot Score`、`hot-topics`、`insurhot_get_hot` 继承自 AIHOT 和 owner 的原始任务。对外标签已改为"关注度"；是否把 API、MCP 标识也改为 `attention`，以彻底避免与品牌 HOT 混淆？ | owner + 技术 | M7 前 |
+| Q14 | Emergence 阶段阈值（N₁、N₂、观察窗口）与"主流专业媒体集中报道"的判定口径 | 研究编辑 | Phase 1 影子运行前 |
 | Q12 | 《保险公司信息披露管理办法》（2018）文号、偿二代第 13 号规则原文等 NEEDS VALIDATION 项 [E§17] | 研究编辑 | W4 |
 
 ---
@@ -1590,7 +1700,7 @@ R3 仍不一致或低置信 ─► 人工队列
 | ADR-011 | Benchmark 公开发布须以律所书面意见为前提 | §13.9 | Proposed |
 | ADR-012 | Benchmark 形态：多维分数卡 + Profile 综合分 + 门槛 + 可比集合 + 被占优 | §13 | Proposed |
 | ADR-013 | 方法论版本化与公开规则页（继承模型榜治理范式） | §13.7 | Proposed |
-| ADR-014 | Hot 与 Change 分离；Change v0 以规则为主 | §18 | Proposed |
+| ADR-014 | 四信号分离：Importance / Change / Emergence 为主，Attention（Hot）为辅；Change v0 以规则为主；Emergence 扩散阶段模型 | §18 | Proposed |
 | ADR-015 | 模型路由 R0–R3 + H；升级条件；月度金额预算 | §24 | Proposed |
 | ADR-016 | BM 判级只由人完成；L/A/E/D/N 与判级规则 | §16 | Proposed |
 | ADR-017 | API 版本策略（v1 兼容 + 新资源）与 evidence[] 契约 | §22 | Proposed |
@@ -1599,6 +1709,7 @@ R3 仍不一致或低置信 ─► 人工队列
 | ADR-020 | 独立性与收入来源白名单 | §3 C3 | Proposed |
 | ADR-021 | 评测集与上线门槛（影子运行） | §25、§31.3 | Proposed |
 | ADR-022 | pgvector 引入阈值 | §21.1 | Proposed |
+| ADR-023 | 品牌与使命：InsurHOT = Insurance High-value Observed Trends；Matters / Changes / Emerges；C0 由 owner 冻结 | §2、§3 C0 | **Accepted（owner 确认）** |
 
 ---
 
@@ -1628,7 +1739,8 @@ R3 仍不一致或低置信 ─► 人工队列
         └──────────────┬────────────────────────┘   │ New Species（BM 卡/L·A·E·D·N/人工判级）      │
                        ▼                            └──────────────┬───────────────────────────────┘
         ┌──────── 评分与检测（确定性为主）──────────────────────────▼──────┐
-        │ Hot（独立参与者衰减，重新校准）   Change（D1–D8 检测器 + reasons） │
+        │ Importance（Matters）· Change（Changes）· Emergence（Emerges）      │
+        │ Attention（Hot，辅助，独立参与者衰减，重新校准）                   │
         │ 所有评分：rule/method_version + evidence                          │
         └──────────────────────────────┬─────────────────────────────────────┘
                                        ▼
@@ -1650,6 +1762,8 @@ R3 仍不一致或低置信 ─► 人工队列
 ---
 
 ## 36. 十个决策问题的回答
+
+> v0.2 校准说明：D3、D8、D10 按 C0 做了措辞校准。D8 的结论从"Change 主轴、Hot 次轴"调整为"三支柱为主、Hot 辅助"。其余决策的结论不变。
 
 ### D1. InsurHOT 应该继承 AIHOT 到什么程度？
 
@@ -1679,6 +1793,8 @@ R3 仍不一致或低置信 ─► 人工队列
 ### D3. Product Benchmark 是否应该进入 MVP？
 
 - **Decision**：**部分进入**。方法论 RFC、UIPS-Core + 医疗险 L2 schema、编码手册、内部原型、产品事件（资讯事实）进入 MVP；**面向中国公众发布的产品评分和比较不进 MVP**，以律所书面意见为前提，放在 Phase 2 决定（ADR-011）。
+  - C0.5 确认 Product Benchmark 是重要能力，且必须"先标准、后评价"。本决策正是按这个顺序安排的：标准层（方法、schema、编码手册）在 MVP 完成，评分层在其后。
+  - 公开评分在中国面临的法律限制，属于**执行约束**，不是定位冲突；已作为 X-2 报告给 owner。
 - **Evidence**：
   - 《互联网保险业务监管办法》第二十三条禁止非保险机构"比较保险产品、保费试算、报价比价"，第十五条禁止"片面比较……简单排名"；
   - 《金融产品网络营销管理办法》2026-09-30 施行，第二条、第十八条、第二十条 [D§5.3]；
@@ -1742,15 +1858,19 @@ R3 仍不一致或低置信 ─► 人工队列
 
 ### D8. Hot Score 与 Change Score 是否都值得建设？
 
-- **Decision**：**都建，但地位不同**。Change 是 InsurHOT 的主轴：首页和日报首节按 Change 排序，v0 以规则为主，覆盖 D1–D5。Hot 是次轴：继承 AIHOT 的机制并重新校准，只衡量关注度。两者永不相互混合，也永不进入 Benchmark。
+- **Decision**：**都建，但 Hot 只作辅助（按 C0 校准）**。
+  - 首页和日报的主轴是三支柱：Importance（Matters）、Change（Changes）、Emergence（Emerges）。
+  - Change v0 以规则为主，覆盖 D1–D3、D5；Emergence v0 覆盖 D4 与扩散阶段。
+  - Hot 是辅助的关注度信号：继承 AIHOT 的机制并重新校准，对外称"关注度"。
+  - 这些信号互不替代，也都不进入 Benchmark。
 - **Evidence**：
   - AIHOT 的 Hot 是确定性计算，继承成本几乎为零 [A§A5]；
   - 保险资讯稀疏，直接沿用 AIHOT 参数会导致榜单长期为空（F-07）；
   - 保险中最有价值的信息（监管生效、条款变化）往往"低热度、高变化"（§18.1）；
   - 公开的结构性变化检测是市场空白 [B§3.2]。
 - **Reasoning**：只有 Hot，InsurHOT 会退化成新闻站；只有 Change，又会失去"今天大家在关注什么"的入口。Change 的规则化实现（生命周期、diff、首次出现、指标突变）成本可控。
-- **Strongest Counterargument**：Change Score 的"结构性"权重是主观先验，容易被质疑；在规则检测器覆盖不全时，"变化流"可能不如"热点流"好看，影响早期留存。
-- **Failure Condition**：如果影子运行期间 Change 流的编辑抽检查准率 < 0.8，或者读者对变化流的点击率持续低于热点流的 1/3，就调整首页主次，但不放弃 Change 的计算与 API。
+- **Strongest Counterargument**：Change Score 的"结构性"权重是主观先验，容易被质疑；在规则检测器覆盖不全时，"变化流"可能不如"关注度榜"好看，影响早期留存。
+- **Failure Condition**：如果影子运行期间 Change 流的编辑抽检查准率 < 0.8，或者三支柱视图的点击率持续低于关注度榜的 1/3，就改进三支柱视图的质量与呈现；**不因此把热度提升为主轴**，因为 C0 定义的 HOT 不是热度。
 - **Confidence**：**高（0.8）**
 
 ### D9. 哪些能力构成 InsurHOT 真正的长期护城河？
@@ -1780,7 +1900,9 @@ R3 仍不一致或低置信 ─► 人工队列
   2. **中国优先的监管与公司情报流，以及 Change v0**：监管生命周期、文本 diff、实体状态变化、NFRA 统计突变；首个样板是 2026 年《银行保险机构信息披露管理办法》从征求意见到正式稿。
   3. **New Species / AI Business Model Radar v0**：58 个案例复核、至少 20 张卡上线、公开判级方法。
 
-  Benchmark 在这三件事期间只做方法论 RFC 和法律意见这两项低成本、非工程工作，与三件事并行。
+  三件事与 C0 三问的对应：第 1 件是三问共同的证据地基；第 2 件主要回答 What matters? 和 What is changing?（Importance v0 + Change v0）；第 3 件回答 What is emerging?（New Species + Emergence v0）。
+
+  Product Benchmark 是重要能力（C0.5），与三件事并行推进"标准层"：方法论 RFC、UIPS schema、编码手册和法律意见（M8）。评分层在标准层与法律意见之后推进。
 - **Evidence**：
   - 第 1 件是其余一切的前置依赖（§20）；
   - 第 2 件的信源可自动化程度最高（NFRA JSON 接口已实测，著作权法第五条允许全文存储 [E§2.1]），法律风险最低，用户价值最直接，而且有一个正在发生的样板监管事件 [E§13]；

@@ -91,6 +91,8 @@ upsertMaterial（唯一入口：身份/修订/时间线规则）
 
 评价：**这是一个"独立来源计数"的热度，而非点击或转发热度，抗刷能力天然较好**。对保险有两个问题：(1) 保险行业日资讯量远低于 AI，48h 窗口 + ≥2 源会让大部分事件无法入榜，窗口和半衰期需按品类（监管 vs 市场新闻）重新校准；(2) 监管文件的重要性与"被多少人讨论"弱相关——Hot 不能代替 Importance/Change。
 
+> 定位校准（v0.2）：InsurHOT 的 HOT = High-value Observed Trends。AIHOT 的 Hot 机制在 InsurHOT 中降为关注度（Attention）辅助信号，产品主轴是 Importance / Change / Emergence 三支柱（规格 §3 C0、§18）。
+
 ## A6. 模型路由与成本（`editorial/models.ts`、`providers/llm.ts`、`receipts.ts`）
 
 - 11 个 capability（prefilter/score/understand/summarize/structure/group/groupReview/digest/report/translate/monitor），每个可经 env 或后台切换模型，切换写审计，只影响新任务。
