@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/stage_upstream.py"
 spec = importlib.util.spec_from_file_location("stage_upstream", SCRIPT)
@@ -46,6 +47,34 @@ class StageTests(unittest.TestCase):
     def test_refuses_existing_destination(self):
         with self.assertRaises(ValueError):
             module.stage(self.repo, self.repo, self.manifest)
+
+    def test_concurrent_destination_is_not_replaced(self):
+        output = self.root / "snapshot"
+        original_mkdir = Path.mkdir
+        competitor_inode = None
+
+        def racing_mkdir(path, *args, **kwargs):
+            nonlocal competitor_inode
+            if path == output:
+                original_mkdir(path)
+                competitor_inode = path.stat().st_ino
+            return original_mkdir(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "mkdir", racing_mkdir):
+            with self.assertRaises(FileExistsError):
+                module.stage(self.repo, output, self.manifest)
+        self.assertTrue(output.is_dir())
+        self.assertEqual(output.stat().st_ino, competitor_inode)
+        self.assertEqual(list(output.iterdir()), [])
+        self.assertEqual(list(self.root.glob(".upstream-stage-*")), [])
+
+    def test_failed_publication_cleans_only_owned_directory(self):
+        output = self.root / "snapshot"
+        with mock.patch.object(Path, "rename", side_effect=OSError("fixture write failure")):
+            with self.assertRaises(OSError):
+                module.stage(self.repo, output, self.manifest)
+        self.assertFalse(output.exists())
+        self.assertEqual(list(self.root.glob(".upstream-stage-*")), [])
 
     def test_refuses_manifest_tampering(self):
         self.manifest["files"][0]["sha"] = "0" * 40

@@ -54,6 +54,7 @@ def stage(repo, destination, manifest):
         raise ValueError("Git tree differs from reviewed manifest")
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix=".upstream-stage-", dir=destination.parent))
+    owned_destination = None
     try:
         for item in actual:
             data = git(repo, "cat-file", "blob", item["sha"])
@@ -64,10 +65,19 @@ def stage(repo, destination, manifest):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
             target.chmod(0o755 if item["mode"] == "100755" else 0o644)
-        if destination.exists() or destination.is_symlink():
-            raise ValueError("Destination appeared while staging")
-        temporary.rename(destination)
+        # mkdir is the exclusive claim: a competing directory or symlink wins
+        # instead of being replaced by a check-then-rename operation.
+        destination.mkdir()
+        stat = destination.stat()
+        owned_destination = (stat.st_dev, stat.st_ino)
+        for child in temporary.iterdir():
+            child.rename(destination / child.name)
+        owned_destination = None
     finally:
+        if owned_destination is not None and not destination.is_symlink() and destination.exists():
+            stat = destination.stat()
+            if (stat.st_dev, stat.st_ino) == owned_destination:
+                shutil.rmtree(destination)
         if temporary.exists():
             shutil.rmtree(temporary)
     return len(actual)
