@@ -38,7 +38,7 @@ tests/      30 个后端测试文件（约 139 个用例），使用本地假服
 | 2 | 页面不调模型，模型只在 worker 任务中调用 | **KEEP**（成本可控 + 可复现的前提） |
 | 3 | 付费请求有回执（`receipts` + `receipt_attempts`），先存后用，重试复用 | **KEEP**，是 Evidence/Provenance 的天然底座 |
 | 4 | 预算熔断：每服务每分钟/小时/天上限 | **KEEP**，增加"按任务类型的月度美元预算" |
-| 5 | 安全阀环境变量（采集、模型、推送）开发测试默认关 | **KEEP** |
+| 5 | 操作说明要求开发测试关闭安全阀；运行时代码的采集/模型缺省开启（§A13） | **ADAPT：M0 修成显式开启，不能原样继承默认值** |
 | 6 | 公开内容匿名、后台仅管理员 | **KEEP**（V1 不做账户体系） |
 | 7 | 来源可追溯；全文展示默认关（`site_fulltext=false`） | **KEEP**，并升级为 Source License 模型 |
 
@@ -79,7 +79,7 @@ upsertMaterial（唯一入口：身份/修订/时间线规则）
 2. **五轴加权 + 内容类型权重表**（sig/nov/cred/reson/act），模型只输出一个整数；权重写在 prompt 中公开。
 3. **prompt 版本 = 内容哈希**；改 prompt 只影响新资料，历史不重算。
 4. **SelectBench**：人工金标 JSONL（development/holdout 分割、stratum 分层）→ 精确率/召回率/阈值扫描 → 后台逐条看错例。这是 InsurHOT 评测体系的现成骨架。
-5. **归组的三分类关系**（SAME_OCCURRENCE / SAME_STORY / UNRELATED / ROUNDUP）+ 低相似度合并时**换一家模型复核**；注释写明"是/否问法在 370 对标注样本上拒绝了一半真合并"（2026-09-28 实测）——说明作者有数据驱动迭代的习惯。
+5. **归组的四分类关系**（SAME_OCCURRENCE / SAME_STORY / UNRELATED / ROUNDUP）+ 低相似度合并时**换一家模型复核**；注释写明"是/否问法在 370 对标注样本上拒绝了一半真合并"（2026-09-28 实测）——说明作者有数据驱动迭代的习惯。
 6. **防幻觉规则**（`rules-anti-hallucination.md`）：不补全年份、不强化语气、排他性表述需原文出现。可直接用于保险（"首款""唯一""最低价"在保险营销中极常见）。
 7. **注入防护**：所有素材是不可信数据（`safety.md`）。
 
@@ -159,3 +159,17 @@ InsurHOT 应继承这一**治理范式**（方法版本化、规则页即代码�
 1. AIHOT 的"行业包"抽象在**资讯层**是真的可用：换信源、换 prompt、换 taxonomy、关模块，即可得到一个可运行的"保险资讯站"。这意味着 InsurHOT 的资讯层可以在数周内上线，而不是数月。
 2. AIHOT 的数据模型是**以 article 为中心**的；InsurHOT 需要**以 entity/document/assertion 为中心**的数据层。这不是重写，而是在现有 schema 旁增量新增（articles 仍是资讯层的中心）。
 3. 最值得保留的是它的"工程伦理"：回执、审计、版本化 prompt、append-only 判断、人工覆盖不被自动流程冲掉、方法版本化、默认不展示全文。这些与 InsurHOT 的 Evidence First 宪法一致。
+
+
+## A13. 2026-09-29 独立复核补遗（上游 589f79e）
+
+以下是源码事实，未运行上游应用，不能称运行验收通过：
+
+- [config.ts](https://github.com/KKKKhazix/AIHOT/blob/589f79e/packages/backend/src/config.ts)：`modelCallsEnabled: bool("MODEL_CALLS_ENABLED", true)`，未设变量默认开启。
+- [schedules.ts](https://github.com/KKKKhazix/AIHOT/blob/589f79e/apps/worker/src/schedules.ts)：`process.env.COLLECT_ENABLED !== "false"`，未设变量同样开启采集调度。
+- [receipts.ts](https://github.com/KKKKhazix/AIHOT/blob/589f79e/packages/backend/src/providers/receipts.ts)：`checkBudget` 在没有预算行时直接 return，意味着不限额。现有计数锁不能替代缺配置时的拒绝策略。
+- 上游 CI 显式设置关闭变量，证明的是 CI 配置，不证明运行时缺省关闭。
+
+新增 **F-15（P1，迁移阻断）**：M0 必须把模型、采集与推送改成显式开启，预算缺失拒绝付费。用本地假服务验证未设置/false/true、缺预算、耗尽、并发预留与未知回执；所有测试禁止外部收费调用。
+
+原审计的代码保留比例为估算，不能当作实际迁移后可运行率或工期承诺。保留 LICENSE/NOTICE 的上游名称不应被品牌清理脚本误删。

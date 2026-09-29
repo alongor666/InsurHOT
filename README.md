@@ -11,3 +11,6 @@ InsurHOT 面向整个保险行业的公开信息空间，坚持 *Evidence first,
 
 - [Phase 0 Architecture & Product Specification](docs/phase0/InsurHOT-Phase0-Spec.md)
 - [定位校准记录（Positioning Delta Review）](docs/phase0/positioning-delta-review.md)
+
+- [独立评审与验收记录](docs/phase0/review-2026-09-29.md)
+- [交付门槛与项目接管](docs/phase0/delivery-gates.md)
