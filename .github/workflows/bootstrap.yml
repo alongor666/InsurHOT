@@ -1,0 +1,28 @@
+name: Bootstrap checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  import-tool:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify local-only snapshot tool
+        run: python3 -m unittest discover -s tests -p 'test_stage_upstream.py' -v
+      - name: Check reviewed manifest
+        run: |
+          python3 - <<'PY'
+          import json, runpy
+          tool = runpy.run_path('scripts/stage_upstream.py')
+          manifest = json.loads(tool['MANIFEST'].read_text())
+          tool['validate_manifest'](manifest)
+          assert manifest['repository'] == 'KKKKhazix/AIHOT'
+          assert manifest['commit'] == tool['PIN']
+          assert len(manifest['files']) == 489
+          PY
