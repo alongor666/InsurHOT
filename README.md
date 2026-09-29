@@ -7,7 +7,11 @@
 
 InsurHOT 面向整个保险行业的公开信息空间，坚持 *Evidence first, opinion last*，服务人和 AI Agent。它不是保险热点站或新闻聚合站，也不是任何一家保险公司的内部经营系统。
 
-当前阶段：Phase 0（规划中）。
+当前阶段：Phase 0 规划基线已验收，M0 工程准备已启动；应用尚未导入或上线。
+
+- [开发行动计划](docs/development/action-plan.md)
+- [上游基线及导入工具](UPSTREAM.md)
+- [项目实时台账](https://github.com/alongor666/InsurHOT/issues/3)
 
 - [Phase 0 Architecture & Product Specification](docs/phase0/InsurHOT-Phase0-Spec.md)
 - [定位校准记录（Positioning Delta Review）](docs/phase0/positioning-delta-review.md)
