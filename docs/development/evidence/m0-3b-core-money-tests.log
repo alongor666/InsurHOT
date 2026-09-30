@@ -1,0 +1,28 @@
+✔ the budget month is the calendar month in Asia/Shanghai (26.8395ms)
+✔ capabilities: collectors by service, embeddings by purpose, models by purpose; every purpose in the code maps (7.800958ms)
+✔ subjects: revisions, fragments and the fact suffix fold into the subject; a story pair counts against both; other shapes refuse (3.510708ms)
+✔ prices: only the exact, approved, unsuspended row for this host; no service-level fallback; endpoints have their own rows (17.959ms)
+✔ chat bound: every byte of the final body as input plus overhead, max_tokens as output, rounded up to the micro (1.540042ms)
+✔ chat bound: anything that could raise the cost unseen is refused (1.959375ms)
+✔ chat bound: reasoning counts as on unless the body switches it off the way this price row was verified (1.1615ms)
+✔ chat bound: every model preset in providers/llm.ts passes the extra check and is decided by its price row (0.547208ms)
+✔ embeddings, per-request and per-unit bounds (1.188833ms)
+✔ with no limit rows everything is refused; each missing or unapproved row refuses by name (61.72875ms)
+✔ a reservation counts against the global, capability and each subject row; exactly the limit passes, a micro more does not (62.013208ms)
+✔ collectors and embeddings have no subject row to satisfy (10.988125ms)
+✔ simultaneous reservations never exceed a limit together (80.1135ms)
+✔ settling and reserving in one transaction, in either order, does not deadlock with other transactions (322.098541ms)
+✔ settlement: the actual cost replaces the reservation; without a usable figure the reservation stays (57.233667ms)
+✔ settlement: only a request the provider clearly did not take gives its money back; status is never consulted (26.205458ms)
+✔ an actual cost above the reservation is counted in full and suspends the price row it was reserved on (51.576125ms)
+✔ the budget month is the one the attempt started in, also when it is settled later (15.593ms)
+✔ the ledger cannot go below zero, and the reconciliation reports a ledger that no longer matches the attempts (23.140792ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 971.767917
+exit=0
