@@ -26,7 +26,7 @@
 - Jina 是 GET 请求，按**返回页面**的 token 计费（`x-usage-tokens`，`jina.ts:52`）；SocialData 搜索的请求参数只有 `query/type/cursor`（`socialdata.ts:70-72`）。两者的调用方都无法限制单次返回量。
 - 所有 provider 把 HTTP 5xx 当作"明确未受理"抛 `ProviderRejectedError`（`llm.ts:206`、`embeddings.ts:50`、`jina.ts:48`、`socialdata.ts:83,138,166`、`dajiala.ts:64,86`）；4xx 同样抛出。
 - 结果未知的回执 30 分钟后由 `ops.recover` 自动放行一次（`admin/runs.ts:112-134`），不核对是否已计费；`release()` 会把 attempt 的 status 改成 failed（`admin/runs.ts:89`）。
-- `subject` 的实际取值不统一：`article:<id>@<rev>`（`analyze.ts:191`）、`article:<id>@<rev>#<片段>`（`translate.ts:77`）、`article:<id>`（`group.ts:281,298`、`extract.ts:112,140`）、`article:<id>:fact:<factId>`（`group.ts:290`）、`story:<id>@<篇数>`（`digest.ts:62`）、`report:<kind>:<key>`（`compose.ts:100`）、`quote:<tweetId>`（`translate.ts:258`）、`x:<id>`（`recognize.ts:120`）；采集侧是共享的：`x:<AUTHOR>`（`monitor/scan.ts:83`）、`source:<id>`（`web-list.ts:103,320`、`x.ts:190`）、裸 `sourceId`（`mp.ts:23,52`）、`x-shard:<key>`（`collect.ts:260`）；embeddings 批次用批内第一条的 id。
+- `subject` 的实际取值不统一：`article:<id>@<rev>`（`analyze.ts:191`）、`article:<id>@<rev>#<片段>`（`translate.ts:77`）、`article:<id>`（`group.ts:281,298`、`extract.ts:112,140`）、`article:<id>:fact:<factId>`（`group.ts:290`）、`story:<id>@<篇数>`（`digest.ts:62`）、`story:<a>:<b>`（故事对合并判定，`group.ts:455`）、`report:<kind>:<key>`（`compose.ts:100`）、`quote:<tweetId>`（`translate.ts:258`）、`x:<id>`（`recognize.ts:120`）；采集侧是共享的：`x:<AUTHOR>`（`monitor/scan.ts:83`）、`source:<id>`（`web-list.ts:103,320`、`x.ts:190`）、裸 `sourceId`（`mp.ts:23,52`）、`x-shard:<key>`（`collect.ts:260`）；embeddings 批次用批内第一条的 id。
 - 代码里没有"预算不足换便宜模型"的路径。`BudgetExceededError` 的处理方式各不相同，见第 8 节。
 - purpose → capability 的映射 `editorial/models.ts:18-28` 只覆盖模型用途；`monitor.context` 只由 SocialData 发出（`monitor/scan.ts:52`）。
 
@@ -53,6 +53,7 @@
 - `per_unit numeric(14,6)`、`unit text`、`max_units_per_request integer`：按对象/按返回 token 计价的服务用。
 - `overhead_tokens integer NOT NULL DEFAULT 0`：供应商在请求体之外隐式加入的固定 token（默认 system、JSON 模式提示等），由 owner 核对后填写。
 - `output_cap_includes_reasoning boolean`：推理 token 是否计入请求体的输出上限。NULL 表示未核对。
+- `reasoning_off text`：经核对、对该模型确实生效的推理关闭方式（`thinking.type=disabled`、`enable_thinking=false` 之一）；NULL 表示该模型无法关闭推理或未核对。
 - `suspended_at timestamptz`、`suspended_reason text`：止损用（第 7 节）。
 
 查找规则：
@@ -88,7 +89,7 @@ LLM 的规则，全部对 **`extra` 展开之后**最终序列化的请求体执
   | `top_p` | 数值 | 否 |
 
   现有全部预设都在这个集合内。`max_tokens`、`max_completion_tokens`、`n`、`thinking_budget`、`tools` 等不在集合内，出现即拒绝；`default` 模型的 `LLM_EXTRA_JSON` 同样受此约束。
-- **推理一律视为开启**，除非最终请求体带有显式关闭项（`thinking.type = "disabled"` 或 `enable_thinking = false`）。推理开启时，价格行的 `output_cap_includes_reasoning` 必须为 true；为 false 或 NULL → 拒绝。因此默认推理而不带任何键的模型（`deepseek-flash-think`、任意 `LLM_MODEL`）同样要有经核对的价格行。
+- **推理一律视为开启**，除非最终请求体带有的显式关闭项与该价格行的 `reasoning_off` 完全相符。关闭键因供应商而异：对一个只认 `thinking.type` 或始终推理的模型发 `enable_thinking=false`，供应商会忽略它并照常推理，所以请求体里出现关闭键本身不算数。推理开启时，价格行的 `output_cap_includes_reasoning` 必须为 true；为 false 或 NULL → 拒绝。因此默认推理而不带任何键的模型（`deepseek-flash-think`、任意 `LLM_MODEL`）同样要有经核对的价格行。
 
 Jina 与 SocialData：当前代码没有任何可声明的上限。**在 owner 核对供应商文档并给出可强制的上限之前，这两个服务不可启用**；不以客户端 `maxBytes` 推算上限。后果见"偏离"表。
 
@@ -106,8 +107,8 @@ Jina 与 SocialData：当前代码没有任何可声明的上限。**在 owner �
 
   按 service 在先，所以 SocialData 以 `monitor.context` 发出的请求计入 `collect.socialdata`。模型服务的 purpose 映射不到 → 拒绝。实施时用测试固定"全仓每个 `paidRequest` 调用的 `(service, purpose)` 都有映射"。
 - `scope = 'subject'`，`key` = 主体类别：**只适用于第 3 步的模型 capability**（采集服务与 embeddings 的 subject 是共享或批次标识，只受前两层约束）。这是对 #4 与 `delivery-gates.md:41`"任务预算"的一种解释——**同一主体当月在所有模型步骤上的累计上限**——需 owner 确认（待批准项 4）。
-  - 主体键由 `subject` 规范化得到：取第一个 `@` 或 `#` 之前的部分，再去掉 `:fact:<id>` 后缀。例：`article:123@4#2`、`article:123:fact:9` → `article:123`；`story:77@12` → `story:77`；`report:daily:2026-09-30` 不变。
-  - 主体类别 = 主体键第一个 `:` 之前的部分（`article`、`story`、`report`、`quote`、`x`）；每个类别一行默认上限，适用于该类别下的每个主体。
+  - 主体键由 `subject` 规范化得到：取第一个 `@` 或 `#` 之前的部分，再去掉 `:fact:<id>` 后缀。例：`article:123@4#2`、`article:123:fact:9` → `article:123`；`story:77@12` → `story:77`；`report:daily:2026-09-30` 不变。故事对 `story:<a>:<b>` 同时计入 `story:<a>` 与 `story:<b>` 两个主体键（两者都须在限内）。
+  - 主体类别 = 主体键第一个 `:` 之前的部分（`article`、`story`、`report`、`quote`、`x`）；每个类别一行默认上限，适用于该类别下的每个主体。限额按**类别**查 `money_budgets`，占用按**主体键**记在台账，两者是不同的 key。`x` 类别只有 `monitor.recognize` 使用，不批准该行即拒绝（monitor 随 ADR-002 删除）。
   - 规范化后为空 → 拒绝。
 
 ### 4. 币种：不换汇
@@ -118,9 +119,9 @@ Jina 与 SocialData：当前代码没有任何可声明的上限。**在 owner �
 
 `receipt_attempts` 增加：`capability text`、`subject_key text`、`reserved_amount numeric(14,6)`、`reserved_currency text`、`settled_amount numeric(14,6)`（与 `reserved_currency` 同币种）、`holds_reservation boolean NOT NULL DEFAULT false`。
 
-占用用**台账行**维护，不对 attempt 逐月求和：新表 `money_usage(scope, key, currency, month, amount)`，在预留、结算、释放的同一事务内增减。另有对账查询（对 attempt 求 `Σ coalesce(settled_amount, reserved_amount) WHERE holds_reservation AND origin = 'live'`，按 `reserved_currency` 与月份分组）在测试与每日运维任务中比对台账，发现漂移即告警。月份按预算时区的自然月，以 attempt 的 `started_at` 归月；跨月的 pending/unknown 归发起月。
+占用用**台账行**维护，不对 attempt 逐月求和：新表 `money_usage(scope, key, currency, month, amount)`，在预留、结算、释放的同一事务内增减。增减一律用相对增量（`SET amount = amount + Δ`），不先读后写绝对值；一笔 attempt 涉及的各行（全局、capability、各主体键）按固定顺序更新。结算把 `coalesce(settled_amount, reserved_amount) − reserved_amount` 加到该 attempt 的每一行；释放从每一行减去 `reserved_amount`。行由 attempt 的 `capability`、`subject_key`、`reserved_currency` 与 `started_at` 所在月份确定，跨月结算写回**发起月**的行。另有对账查询（对 attempt 求 `Σ coalesce(settled_amount, reserved_amount) WHERE holds_reservation AND origin = 'live'`，按 `reserved_currency` 与月份分组）在测试与每日运维任务中比对台账，发现漂移即告警。月份按预算时区的自然月，以 attempt 的 `started_at` 归月；跨月的 pending/unknown 归发起月。
 
-放行只在确实要发请求的分支执行（复用已有回执、busy、unknown 分支不取锁），在一个事务内先取**单一全局** advisory lock（`budget:money`），再取现有每服务锁（锁序固定；`publish.ts` 的锁与此路径不相交）：
+放行在现有事务内进行。判断走哪个分支需要先在每服务锁内读取回执（`receipts.ts:116-126`），所以锁序是：**每服务锁 → 判断分支 → 仅在确实要发请求的分支再取单一全局 advisory lock（`budget:money`）**；复用已有回执、busy、unknown 分支不取全局锁。所有路径顺序一致，不会死锁；`publish.ts` 的锁与此路径不相交。取得全局锁后：
 
 1. 查价格、算上界 `w`。
 2. 读适用各行的台账；任一行 `amount + w > monthly_limit` → 抛 `MonthlyBudgetExhaustedError`（第 8 节）。
@@ -135,7 +136,7 @@ Jina 与 SocialData：当前代码没有任何可声明的上限。**在 owner �
 | 收到回执但无 usage/成本，或币种不符 | true | NULL（按预留额计） |
 | 收到回执后因输出不可用被 `rejectReceivedResponse` 改为 failed | true | 同上两行（供应商已计费） |
 | 供应商响应带实际金额（Dajiala `cost_money`），无论业务码是否为 0 | true | 该金额（**优先于下面各行**） |
-| 明确未受理：发送前连接失败（`llm.ts:150-153` 的连接类错误）；HTTP 401/402/403/429；Dajiala 限流码 `-1` | false | 0 |
+| 明确未受理（默认清单，由 owner 在待批准项 7 确认）：发送前连接失败（`llm.ts:150-153` 的连接类错误）；HTTP 401/402/403/429；Dajiala 限流码 `-1` | false | 0 |
 | **HTTP 400/422、5xx**、Dajiala 其余业务码且不带 `cost_money`、超时、连接中断、进程中断（pending 过期） | **true** | NULL（按预留额计，金额口径上视同 unknown） |
 | unknown 被人工放行且确认"未计费" | false | 0 |
 | unknown 被人工放行且确认"已计费"，或被自动放行（未核对） | **true** | NULL |
@@ -143,6 +144,8 @@ Jina 与 SocialData：当前代码没有任何可声明的上限。**在 owner �
 400/422 与 5xx 都不证明未计费（模型供应商可能在生成之后才做内容审查并返回 400；网关可能在上游已计费之后返回 502/504）。哪些错误码可以改判为"未受理"由 owner 核对供应商文档后批准（待批准项 7），实施时 `ProviderRejectedError` 把 HTTP 状态码与供应商业务码拆成两个字段。
 
 进程在"提交预留后、发请求前"崩溃：pending 过期后转 unknown，预留保持到月底，除非人工核对后按"未计费"放行。这是有意的保守。
+
+后台的人工核对入口现在只接受 unknown 回执（`admin/runs.ts:103-106`）；实施时扩展为也能处理"status 已是 failed 但 `holds_reservation` 仍为真"的 attempt（400/422/5xx），否则供应商的一次 5xx 风暴会把当月额度占住，只能靠提高上限恢复。
 
 ### 6. 未知回执
 
@@ -166,7 +169,9 @@ Jina 与 SocialData：当前代码没有任何可声明的上限。**在 owner �
 | `jobs/events.ts:28-31`（digest worker，无 catch） | pg-boss `retryLimit: 3` 后作废 | 同上 |
 | `events/group.ts:138`（召回时的嵌入） | 向上抛到 group worker | 由 group worker 的处理覆盖 |
 | `editorial/translate.ts:266,318,337` | 消息匹配 `/budget/i` 则停止本轮、不计尝试 | 保持；新错误消息必须匹配 |
-| `reports/compose.ts:100`（`reports.catch-up` 每小时，`schedules.ts:58`） | 每小时重试 | 记为 `budget_blocked`，当月不再自动重试 |
+| `reports/compose.ts:100,203`（定时 `reports.daily/weekly/monthly`，`schedules.ts:47-55`；`reports.catch-up` 每小时，`schedules.ts:58`） | 定时触发；catch-up 每小时重试 | 记为 `budget_blocked`，当月不再自动重试 |
+| `scripts/eval-selection.ts:88-93` | 逐用例记录错误后继续，最后导入 SelectBench | 月度耗尽时中止整轮，不导入结果，非零码退出 |
+| `scripts/regroup-events.ts:199`（consolidate） | 向上抛 | 非零码退出并说明原因 |
 | `monitor/scan.ts:163-172` | 计入该帖的失败次数 | 不计失败次数，本轮停止（模块随 ADR-002 删除） |
 | `content/extract.ts:84-91`（Jina 兜底） | 返回 null，放弃兜底 | 同样放弃，并记录原因 |
 | `content/extract.ts:140`（x_article，无 catch） | 向上抛 | 作业以 `budget_blocked` 结束（随 ADR-002 删除） |
@@ -215,7 +220,7 @@ Jina 与 SocialData：当前代码没有任何可声明的上限。**在 owner �
 
 ## 后果
 
-- 迁移：`service_prices` 加 10 列；新表 `money_budgets`、`money_usage`；`receipt_attempts` 加 6 列；文章处理状态增加 `budget_blocked`；不改写历史迁移。
+- 迁移：`service_prices` 加 11 列；新表 `money_budgets`、`money_usage`；`receipt_attempts` 加 6 列；文章处理状态增加 `budget_blocked`；不改写历史迁移。
 - 五个 provider 的调用点要传计费参数；LLM 的上界改为从最终请求体计算；硬编码单价删除；`ProviderRejectedError` 拆分状态码字段。
 - 第 8 节表中的每条路径都要处理月度耗尽。
 - 表为空时一切经 `paidRequest` 的调用被拒（即使将来闭锁解除）：**数值由 owner 给出之前，系统可完整测试"拒绝"路径与预留/结算逻辑，不能验证真实金额。**
@@ -226,10 +231,10 @@ Jina 与 SocialData：当前代码没有任何可声明的上限。**在 owner �
 1. 币种（建议单一 CNY）。
 2. 全局月度上限。
 3. 每个要启用的 capability 的月度上限。
-4. "任务预算"的口径是否按第 3 节的解释；若是，各主体类别（`article`、`story`、`report`、`quote`）的单主体当月上限。
+4. "任务预算"的口径是否按第 3 节的解释；若是，各主体类别（`article`、`story`、`report`、`quote`，以及只在保留 monitor 时才需要的 `x`）的单主体当月上限。
 5. 预算月份的时区（建议 `Asia/Shanghai`）与告警阈值（建议 80%）。
-6. 每个要启用的 `(service, model 或端点)` 的价格行：最高阶梯价、供应商主机名、来源链接、核对日期、隐式固定 token；推理 token 是否计入输出上限；图片输入如何计费；按返回量计费的服务的供应商侧可强制上限。
-7. 各供应商哪些错误码确属"处理前拒绝、不计费"，可从"保持占用"改判为释放。
+6. 每个要启用的 `(service, model 或端点)` 的价格行：最高阶梯价、供应商主机名、来源链接、核对日期、隐式固定 token；推理 token 是否计入输出上限、对该模型确实生效的推理关闭方式；图片输入如何计费；按返回量计费的服务的供应商侧可强制上限。
+7. 各供应商哪些错误码确属"处理前拒绝、不计费"：确认默认释放清单（连接失败、401/402/403/429、Dajiala `-1`），并指出还有哪些可从"保持占用"改判为释放。
 8. 按供应商账单做月度对账的责任人与做法。
 9. 未知回执是否保留 30 分钟自动放行（建议保留但不释放金额）；`budget_blocked` 条目人工恢复时的限速值。
 10. "偏离及功能后果"表各项，尤其是：同 capability 共用上限还是每模型独立预算；Jina/SocialData 停用是否可接受。
