@@ -17,7 +17,7 @@ python3 -m unittest discover -s tests -p 'test_stage_upstream.py' -v
 
 2026-09-30本地执行：489文件验证及隔离暂存成功，7项工具测试通过。独立复审发现的目标目录竞态已修正：先独占创建目标目录，存在则失败；只清理本次创建且身份未变的目录，不能用rename替换他人目录。暂存输出不是对读者原子可见的发布，脚本成功退出后才可供后续整合使用。M0.2已进一步完成根目录映射整合、489项blob/模式验证、11项工具测试、typecheck及web build。合并时 Docker/PostgreSQL 不可用；其后本机 PostgreSQL 18 补跑迁移、seed 与 backend tests（PR #17），Docker 仍未运行。品牌清理、安全默认/预算修复及完整应用CI仍依行动计划完成；[本地验收证据](docs/development/m0-integration-evidence.md)。
 
-[M0.2路径/依赖/安全入口预检](docs/development/m0-integration-preflight.md)及[逐文件映射](vendor-manifests/aihot-import-map.json)已落实，当前状态为integrated-pending-review。可运行 `python3 scripts/verify_upstream_import.py` 复核489项原始字节与模式；该校验不认证运行时安全。
+[M0.2路径/依赖/安全入口预检](docs/development/m0-integration-preflight.md)及[逐文件映射](vendor-manifests/aihot-import-map.json)已落实，映射状态已改为 integrated（M0.2/M0.3a 合入 main 后）。可运行 `python3 scripts/verify_upstream_import.py` 复核489项原始字节与模式；该校验不认证运行时安全。
 
 ## M0.3a 受控安全差异
 

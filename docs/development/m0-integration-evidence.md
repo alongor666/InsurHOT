@@ -1,6 +1,6 @@
 # M0.2 本地整合证据
 
-2026-09-30；状态：integrated-pending-review。本记录对应包含它的提交，远程应用导入提交为 `8f5244905f076a9e8b31d79c7cc724c1639c68c3`，其树 `c0c2b667f69a12054cb9f45d66df69fe2654c0d6` 与本地验证的导入提交 `1b779ae53aeab383a73d21f9ef2f9513d82d6837` 相同；独立评审绑定最终提交，不把本作者自检作为独立通过。
+2026-09-30；状态：integrated-pending-review（本记录为 M0.2 评审时的历史快照，不再更新；M0.2/M0.3a 合入 main 后 `aihot-import-map.json` 的 status 已改为 integrated，见 PR #18）。本记录对应包含它的提交，远程应用导入提交为 `8f5244905f076a9e8b31d79c7cc724c1639c68c3`，其树 `c0c2b667f69a12054cb9f45d66df69fe2654c0d6` 与本地验证的导入提交 `1b779ae53aeab383a73d21f9ef2f9513d82d6837` 相同；独立评审绑定最终提交，不把本作者自检作为独立通过。
 
 ## 范围
 
