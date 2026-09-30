@@ -6,7 +6,7 @@ import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
@@ -422,6 +422,47 @@ test("a link, a directory or a pipe under a batch's name is never followed, sent
   const after = await run(dir);
   assert.deepEqual([after.delivered, list(dir, ".aside"), (await stored(`d-${RUN}-secret`)).deliveries, lstatSync(secret).nlink], [1, [], 0, 1]);
   assert.ok(lstatSync(path.join(dir, "quarantine", "recovered-4243-0.json")).isSymbolicLink() && lstatSync(path.join(dir, "quarantine", "recovered-4243-1.json")).isDirectory());
+});
+
+test("what is set apart keeps every entry, and a delivery the server confirmed is recorded as delivered even when nothing can be written locally", { skip: process.getuid?.() === 0 && "permissions do not bind root" }, async () => {
+  const dir = inbox();
+  const root = path.dirname(dir);
+  // Twice in a row the file is swapped, mid-request, for a link to nowhere: both links are kept.
+  for (const k of [0, 1]) {
+    const file = drop(dir, "a.json", batch(`d-${RUN}-apart-${k}`));
+    let done = false;
+    const r = await run(dir, { fetchImpl: (...args) => { if (!done) { done = true; unlinkSync(file); symlinkSync(path.join(root, `nowhere-${k}`), file); } return fetch(...args); } });
+    assert.deepEqual(counts(r), [1, 0, 0, 0, 0]);
+  }
+  const apart = list(dir, "quarantine");
+  assert.deepEqual([apart.length, apart.map((n) => path.basename(readlinkSync(path.join(dir, "quarantine", n)))).sort()], [2, ["nowhere-0", "nowhere-1"]]);
+
+  // The archive cannot be written: the server has the batch, the ledger says so, the file waits and the next run finishes.
+  const id = `d-${RUN}-apart-readonly`;
+  drop(dir, "b.json", batch(id));
+  chmodSync(path.join(dir, "delivered"), 0o500);
+  try {
+    const blocked = await run(dir);
+    const line = ledger(dir).at(-1)!;
+    assert.deepEqual([counts(blocked), exitCodeFor(blocked), line.outcome, /^local_E(ACCES|PERM)$/.test(String(line.error)), list(dir, "pending"), (await stored(id)).deliveries], [[1, 0, 0, 0, 0], 0, "delivered", true, ["b.json"], 1]);
+  } finally {
+    chmodSync(path.join(dir, "delivered"), 0o700);
+  }
+  const finished = await run(dir);
+  assert.deepEqual([counts(finished), list(dir, "pending"), existsSync(path.join(dir, "delivered", `${id}.json`)), (await stored(id)).deliveries], [[0, 1, 0, 0, 0], [], true, 1]);
+
+  // Nothing can be set apart: the leftover is noted and stays; the run, and the next file, go on.
+  mkdirSync(path.join(dir, ".aside", "4244-0"));
+  drop(dir, "c.json", batch(`d-${RUN}-apart-after`));
+  chmodSync(path.join(dir, "quarantine"), 0o500);
+  try {
+    const r = await run(dir);
+    assert.deepEqual([counts(r), list(dir, ".aside"), ledger(dir).some((l) => l.file === ".aside/4244-0" && l.outcome === "skipped")], [[1, 0, 0, 0, 1], ["4244-0"], true]);
+  } finally {
+    chmodSync(path.join(dir, "quarantine"), 0o700);
+  }
+  await run(dir);
+  assert.deepEqual(list(dir, ".aside"), []);
 });
 
 test("archives, receipts and refusals never write over one another, whatever the ids and file names", async () => {

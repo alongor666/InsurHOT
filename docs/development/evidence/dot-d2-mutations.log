@@ -208,3 +208,20 @@
 ℹ fail 1
 ℹ cancelled 1
 (the run did not end: with a blocking open the test process waits on the pipe for ever, and the runner's timeout cannot fire while the event loop is blocked; the process was killed by hand after more than 8 minutes)
+
+# ---- after review round 3 ----
+## no mutation
+ℹ pass 15
+ℹ fail 0
+## mutation: a name in quarantine counts as free when a dangling link holds it (the round-3 code)
+✖ what is set apart keeps every entry, and a delivery the server confirmed is recorded as delivered even when nothing can be written locally
+ℹ pass 14
+ℹ fail 1
+## mutation: a local failure after the server confirmed is reported as a retry (the round-3 code for the archive)
+✖ what is set apart keeps every entry, and a delivery the server confirmed is recorded as delivered even when nothing can be written locally
+ℹ pass 14
+ℹ fail 1
+## mutation: a leftover that cannot be handled ends the run (reviewer's round-3 mutation)
+✖ what is set apart keeps every entry, and a delivery the server confirmed is recorded as delivered even when nothing can be written locally
+ℹ pass 14
+ℹ fail 1

@@ -156,7 +156,9 @@ function writeNew(file: string, data: string | Buffer): boolean {
 
 /** A name in `dir` under which neither the file nor its "<name><suffix>" companion exists yet. */
 function freeName(dir: string, name: string, at: Date, companion = ""): string {
-  const taken = (n: string) => existsSync(path.join(dir, n)) || (companion !== "" && existsSync(path.join(dir, `${n}${companion}`)));
+  // lstat, not exists: a dangling link is an entry too, and a rename onto it would replace it.
+  const there = (n: string) => lstatSync(path.join(dir, n), { throwIfNoEntry: false }) !== undefined;
+  const taken = (n: string) => there(n) || (companion !== "" && there(`${n}${companion}`));
   if (!taken(name)) return name;
   const stamp = at.toISOString().replace(/[:.]/g, "");
   for (let n = 0; ; n++) {
@@ -345,18 +347,20 @@ export async function runDotBridge(options: BridgeOptions): Promise<BridgeSummar
             receivedAt: typeof answer.receivedAt === "string" ? answer.receivedAt : null, firstSeenAt: typeof answer.firstSeenAt === "string" ? answer.firstSeenAt : null,
             itemCount: typeof answer.itemCount === "number" ? answer.itemCount : null, recordedAt: now().toISOString(),
           };
-          writeWhole(path.join(receipts, `${deliveryId}.json`), `${JSON.stringify(receipt, null, 2)}\n`);
-          // The archive is the bytes that were sent. An earlier archive of this delivery stays: when the server
-          // says "duplicate" it holds the same content; should it say "received" for other bytes (its store was
-          // reset), both are kept.
-          const archive = path.join(delivered, `${deliveryId}.json`);
-          if (!writeNew(archive, body) && answer.status === "received" && !readFileSync(archive).equals(body)) {
-            writeNew(path.join(delivered, freeName(delivered, `${deliveryId}.json`, now())), body);
-          }
-          // Only now, and only if it is still that file, does the pending file go. The delivery is a fact
-          // whatever happens to the local clean-up: a failure there is noted, not reported as a retry.
+          // The delivery is a fact from here on, whatever happens to the local bookkeeping: a failure to write
+          // the receipt or the archive, or to clear the pending file, is noted beside the outcome, not reported
+          // as a retry. The file then stays in pending; the next run gets "duplicate" and finishes the job.
           let cleanup: string | null = null;
           try {
+            writeWhole(path.join(receipts, `${deliveryId}.json`), `${JSON.stringify(receipt, null, 2)}\n`);
+            // The archive is the bytes that were sent. An earlier archive of this delivery stays: when the server
+            // says "duplicate" it holds the same content; should it say "received" for other bytes (its store was
+            // reset), both are kept.
+            const archive = path.join(delivered, `${deliveryId}.json`);
+            if (!writeNew(archive, body) && answer.status === "received" && !readFileSync(archive).equals(body)) {
+              writeNew(path.join(delivered, freeName(delivered, `${deliveryId}.json`, now())), body);
+            }
+            // Only now, and only if it is still that file, does the pending file go.
             const parked = takeAway(name, sent);
             if (parked) unlinkSync(parked);
           } catch (error) {
