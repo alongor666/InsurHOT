@@ -93,7 +93,9 @@ test("with the valve off nothing is sent", async () => {
 
 test("an unknown outcome is released automatically once, so a lost answer costs at most one repeat", async () => {
   // A service without a budget row: the budget tests above may have used up deepseek's.
-  const req = { service: "invariant-unbudgeted", purpose: "invariant_test", subject: `lost-${tag()}`, identity: { lost: tag() } };
+  // Blocked by the paid lock (tests/paid-lock-blocked-cases.txt); when it opens this needs an approved price row and limits.
+  const req = { service: "invariant-unbudgeted", purpose: "invariant_test", subject: `lost-${tag()}`, identity: { lost: tag() },
+    money: { priceKey: "test", baseUrl: "http://127.0.0.1:1", worstCase: () => 0 } };
   let sent = 0;
   const lost = () => {
     sent += 1;

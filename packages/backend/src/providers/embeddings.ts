@@ -6,7 +6,8 @@ import { outboundFetch, explicitlyEnabled } from "../outbound-policy.ts";
 import { config, credential } from "../config.ts";
 import { sql } from "../db.ts";
 import { sha256 } from "../lib/ids.ts";
-import { paidRequest, ProviderRejectedError } from "./receipts.ts";
+import { paidRequest, ProviderRejectedError, type MoneySpec } from "./receipts.ts";
+import { embeddingsWorstCase, tokenCost } from "./money.ts";
 
 const own = !!credential("models", "EMBEDDING_API_KEY");
 export const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || (own ? "text-embedding-3-small" : "text-embedding-v4");
@@ -32,18 +33,27 @@ export function embeddingsAvailable(): boolean {
   return config.modelCallsEnabled && !!(credential("models", "EMBEDDING_API_KEY") ?? credential("models", "DASHSCOPE_API_KEY")) && explicitlyEnabled("EMBEDDINGS_ENABLED");
 }
 
+/** How an embeddings request is priced: every byte of its text body on the model's own row at this host. */
+export function embeddingsMoney(baseUrl: string, body: Record<string, unknown>): MoneySpec {
+  return { priceKey: String(body.model), baseUrl, worstCase: (price) => embeddingsWorstCase(price, body), actualCost: (price, outcome) => tokenCost(price, outcome.usage) };
+}
+
 async function embedBatch(texts: string[], subject: string): Promise<number[][]> {
   if (!config.modelCallsEnabled) throw new Error("Model calls are disabled (MODEL_CALLS_ENABLED=false)");
   const base = own ? credential("models", "EMBEDDING_BASE_URL") ?? "https://api.openai.com/v1" : credential("models", "DASHSCOPE_BASE_URL") ?? "https://dashscope.aliyuncs.com/compatible-mode/v1";
   const key = own ? credential("models", "EMBEDDING_API_KEY") : credential("models", "DASHSCOPE_API_KEY");
   if (!key) throw new Error("EMBEDDING_API_KEY (or DASHSCOPE_API_KEY) missing");
+  const body = { model: EMBEDDING_MODEL, input: texts, ...(EMBEDDING_DIMS > 0 ? { dimensions: EMBEDDING_DIMS } : {}), encoding_format: "float" };
   const receipt = await paidRequest(
-    { service: SERVICE, model: EMBEDDING_MODEL, purpose: "embedding", subject, identity: { model: EMBEDDING_MODEL, dims: EMBEDDING_DIMS, texts: texts.map((t) => sha256(t)) }, requestSummary: { count: texts.length } },
+    {
+      service: SERVICE, model: EMBEDDING_MODEL, purpose: "embedding", subject, identity: { model: EMBEDDING_MODEL, dims: EMBEDDING_DIMS, texts: texts.map((t) => sha256(t)) }, requestSummary: { count: texts.length },
+      money: embeddingsMoney(base, body),
+    },
     async () => {
       const res = await outboundFetch("embeddings", `${base.replace(/\/$/, "")}/embeddings`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model: EMBEDDING_MODEL, input: texts, ...(EMBEDDING_DIMS > 0 ? { dimensions: EMBEDDING_DIMS } : {}), encoding_format: "float" }),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(60_000),
       });
       const text = await res.text();

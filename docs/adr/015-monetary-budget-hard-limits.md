@@ -50,7 +50,7 @@
 
 - `approved_by text`、`approved_on date`：两者非空才算已批准。批准只能经后台操作写入：`approved_by` 取后台会话里的操作者身份（限 owner 角色），同时写 `audit_log`；不提供迁移或 seed 预填。
 - `base_host text`：该价格适用的供应商主机名。请求解析出的 base URL 主机名必须与之相等，否则拒绝——防止 `LLM_BASE_URL` 指向更贵的转售方而模型名不变。
-- `per_unit numeric(14,6)`、`unit text`、`max_units_per_request integer`：按对象/按返回 token 计价的服务用。
+- `per_unit numeric(18,10)`、`unit text`、`max_units_per_request integer`：按对象/按返回 token 计价的服务用（按 token 的单价是百万分之一元的量级，需要十位小数）。
 - `overhead_tokens integer NOT NULL DEFAULT 0`：供应商在请求体之外隐式加入的固定 token（默认 system、JSON 模式提示等），由 owner 核对后填写。
 - `output_cap_includes_reasoning boolean`：推理 token 是否计入请求体的输出上限。NULL 表示未核对。
 - `reasoning_off text`：经核对、对该模型确实生效的推理关闭方式（`thinking.type=disabled`、`enable_thinking=false` 之一）；NULL 表示该模型无法关闭推理或未核对。
@@ -59,7 +59,7 @@
 查找规则：
 
 - **模型服务**（请求带 `model`）必须命中 `(service, model)` 精确行且 `base_host` 相符；**不回退**到服务级行。
-- **非模型服务**（`model` 为 NULL）按 `(service, <端点名>)` 精确行；Dajiala 的 `post_history` 与 `article_detail` 各一行。
+- **非模型服务**（`model` 为 NULL）按 `(service, <端点名>)` 精确行：Dajiala 的 `post_history`、`article_detail`；Jina 的 `reader`；SocialData 的 `search`、`article`、`tweet`。
 - 价格表填**最高阶梯价**；有阶梯、时段或缓存折扣的，只取最贵的一档。
 - 查不到、未批准、主机不符或已停用 → 拒绝。
 
@@ -121,7 +121,7 @@ Jina 与 SocialData：当前代码没有任何可声明的上限。**在 owner �
 
 占用用**台账行**维护，不对 attempt 逐月求和：新表 `money_usage(scope, key, currency, month, amount)`，在预留、结算、释放的同一事务内增减。增减一律用相对增量（`SET amount = amount + Δ`），不先读后写绝对值；一笔 attempt 涉及的各行（全局、capability、各主体键）按固定顺序更新。结算把 `coalesce(settled_amount, reserved_amount) − reserved_amount` 加到该 attempt 的每一行；释放从每一行减去 `reserved_amount`。行由 attempt 的 `capability`、`subject_key`、`reserved_currency` 与 `started_at` 所在月份确定，跨月结算写回**发起月**的行。另有对账查询（对 attempt 求 `Σ coalesce(settled_amount, reserved_amount) WHERE holds_reservation AND origin = 'live'`，按 `reserved_currency` 与月份分组）在测试与每日运维任务中比对台账，发现漂移即告警。月份按预算时区的自然月，以 attempt 的 `started_at` 归月；跨月的 pending/unknown 归发起月。
 
-放行在现有事务内进行。判断走哪个分支需要先在每服务锁内读取回执（`receipts.ts:116-126`），所以锁序是：**每服务锁 → 判断分支 → 仅在确实要发请求的分支再取单一全局 advisory lock（`budget:money`）**；复用已有回执、busy、unknown 分支不取全局锁。所有路径顺序一致，不会死锁；`publish.ts` 的锁与此路径不相交。结算同样先取全局锁（评审实测：结算不取全局锁时，"先结算后预留"的事务会与并发预留死锁），因此锁序统一为"（每服务锁 →）全局锁 → attempt 行 → 台账行"，并对调用方有两条约束：每服务锁只能在第一次调用金额函数之前取，取得全局锁后不得再取；同一事务里对已有 attempt 行的写入必须在金额函数之后，或先显式取全局锁。取得全局锁后：
+放行在现有事务内进行。判断走哪个分支需要先在每服务锁内读取回执（`receipts.ts:116-126`），所以锁序是：**每服务锁 → 判断分支 → 仅在确实要发请求的分支再取单一全局 advisory lock（`budget:money`）**；复用已有回执、busy、unknown 分支不取全局锁。所有路径顺序一致，不会死锁；`publish.ts` 的锁与此路径不相交。结算同样先取全局锁（评审实测：结算不取全局锁时，"先结算后预留"的事务会与并发预留死锁），因此锁序统一为"每服务锁 → receipt 行 → 全局锁 → attempt 行 → 台账行"，并对调用方有三条约束：每服务锁只能在第一次调用金额函数之前取，取得全局锁后不得再取；会触及 receipt 行的事务必须在金额函数之前先锁住该行（claim 与标记 unknown 都从 receipt 行开始，评审实测：结算若最后才碰 receipt 行，会与它们成环死锁）；同一事务里对已有 attempt 行的写入必须在金额函数之后，或先显式取全局锁。取得全局锁后：
 
 1. 查价格、算上界 `w`。
 2. 读适用各行的台账；任一行 `amount + w > monthly_limit` → 抛 `MonthlyBudgetExhaustedError`（第 8 节）。

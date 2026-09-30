@@ -3,7 +3,8 @@
 // as the actual cost. Docs: https://s.apifox.cn/410674f9-f451-4b4f-957a-5f54f243bc83
 import { credential } from "../config.ts";
 import { guardedFetch } from "../lib/http-fetch.ts";
-import { paidRequest, ProviderRejectedError, type CallOutcome } from "./receipts.ts";
+import { paidRequest, ProviderRejectedError, type CallOutcome, type MoneySpec } from "./receipts.ts";
+import { perRequestWorstCase } from "./money.ts";
 
 export interface MpPost {
   position: number;
@@ -40,19 +41,27 @@ function base(): { url: string; key: string } {
   return { url: (credential("collectors", "DAJIALA_BASE_URL") ?? "https://www.dajiala.com").replace(/\/$/, ""), key };
 }
 
-/** Provider codes: -1 rate limit (retry later); 20001 balance; 101/104/107 account gone; others rejected. */
-function outcomeOf(json: { code?: number; msg?: string; cost_money?: number }, label: string): CallOutcome["cost"] {
+/**
+ * Provider codes: -1 rate limit (retry later); 20001 balance; 101/104/107 account gone; others rejected.
+ * A refusal that still reports cost_money is counted at that figure; only the rate limit is known not to
+ * be billed, every other code keeps the reservation.
+ */
+export function dajialaOutcome(json: { code?: number; msg?: string; cost_money?: number }, label: string): CallOutcome["cost"] {
   const code = Number(json.code ?? 0);
-  if (code === -1) throw new ProviderRejectedError(`dajiala ${label}: rate limited`, 429, true);
-  if (code !== 0) throw new ProviderRejectedError(`dajiala ${label} code ${code}: ${json.msg ?? ""}`.trim(), code, false);
-  return typeof json.cost_money === "number" ? { amount: json.cost_money, currency: "CNY", basis: "actual" } : null;
+  const charged = typeof json.cost_money === "number" ? { amount: json.cost_money, currency: "CNY" } : undefined;
+  if (code === -1) throw new ProviderRejectedError(`dajiala ${label}: rate limited`, 429, true, { providerCode: code, notBilled: true, cost: charged });
+  if (code !== 0) throw new ProviderRejectedError(`dajiala ${label} code ${code}: ${json.msg ?? ""}`.trim(), code, false, { providerCode: code, cost: charged });
+  return charged ? { ...charged, basis: "actual" } : null;
 }
+
+/** Each endpoint has its own per-request price row. */
+export const dajialaMoney = (endpoint: "post_history" | "article_detail", baseUrl: string): MoneySpec => ({ priceKey: endpoint, baseUrl, worstCase: perRequestWorstCase });
 
 /** Latest posts of one account (first page, newest first). `window` buckets the receipt identity. */
 export async function mpHistory(ghid: string, opts: { subject: string; window: string }): Promise<MpHistory> {
   const { url, key } = base();
   const receipt = await paidRequest(
-    { service: "dajiala", purpose: "mp_history", subject: opts.subject, identity: { ghid, window: opts.window }, requestSummary: { ghid } },
+    { service: "dajiala", purpose: "mp_history", subject: opts.subject, identity: { ghid, window: opts.window }, requestSummary: { ghid }, money: dajialaMoney("post_history", url) },
     async () => {
       const res = await guardedFetch(`${url}/fbmain/monitor/v3/post_history`, {
         method: "POST",
@@ -63,7 +72,7 @@ export async function mpHistory(ghid: string, opts: { subject: string; window: s
       });
       if (res.status === 429 || res.status >= 500) throw new ProviderRejectedError(`dajiala HTTP ${res.status}`, res.status, true);
       const json = JSON.parse(res.text()) as { code?: number; msg?: string; cost_money?: number };
-      const cost = outcomeOf(json, "post_history");
+      const cost = dajialaOutcome(json, "post_history");
       return { response: json, cost, usage: { posts: Array.isArray((json as { data?: unknown[] }).data) ? (json as { data: unknown[] }).data.length : 0 } };
     },
   );
@@ -75,7 +84,7 @@ export async function mpHistory(ghid: string, opts: { subject: string; window: s
 export async function mpArticle(articleUrl: string, opts: { subject: string; identity: string }): Promise<MpArticle> {
   const { url, key } = base();
   const receipt = await paidRequest(
-    { service: "dajiala", purpose: "mp_article", subject: opts.subject, identity: { article: opts.identity }, requestSummary: { url: articleUrl } },
+    { service: "dajiala", purpose: "mp_article", subject: opts.subject, identity: { article: opts.identity }, requestSummary: { url: articleUrl }, money: dajialaMoney("article_detail", url) },
     async () => {
       const res = await guardedFetch(`${url}/fbmain/monitor/v3/article_detail?${new URLSearchParams({ url: articleUrl, key, mode: "1", verifycode: "" })}`, {
         headers: { accept: "application/json" },
@@ -85,7 +94,7 @@ export async function mpArticle(articleUrl: string, opts: { subject: string; ide
       });
       if (res.status === 429 || res.status >= 500) throw new ProviderRejectedError(`dajiala HTTP ${res.status}`, res.status, true);
       const json = JSON.parse(res.text()) as { code?: number; msg?: string; cost_money?: number };
-      const cost = outcomeOf(json, "article_detail");
+      const cost = dajialaOutcome(json, "article_detail");
       return { response: json, cost, usage: { chars: String((json as { content?: string }).content ?? "").length } };
     },
   );

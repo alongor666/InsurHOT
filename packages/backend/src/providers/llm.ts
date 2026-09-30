@@ -5,7 +5,8 @@ import { outboundFetch } from "../outbound-policy.ts";
 import type { z } from "zod";
 import { config, credential } from "../config.ts";
 import { sha256 } from "../lib/ids.ts";
-import { completeReceipt, paidRequest, ProviderRejectedError, rejectReceivedResponse } from "./receipts.ts";
+import { completeReceipt, paidRequest, ProviderRejectedError, rejectReceivedResponse, type MoneySpec } from "./receipts.ts";
+import { chatWorstCase, tokenCost } from "./money.ts";
 import { sql } from "../db.ts";
 
 export interface ModelSpec {
@@ -152,6 +153,15 @@ function isConnectFailure(error: unknown): boolean {
   return ["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "UND_ERR_CONNECT_TIMEOUT", "ECONNRESET_BEFORE_SEND", "CERT_HAS_EXPIRED"].includes(code ?? "");
 }
 
+/** How a chat request is priced: by the body exactly as it is sent, on the model's own row at this host, bounded by max_tokens. */
+export function chatMoney(spec: Pick<ModelSpec, "model" | "extra">, baseUrl: string, body: Record<string, unknown>): MoneySpec {
+  return {
+    priceKey: spec.model, baseUrl,
+    worstCase: (price) => chatWorstCase(price, body, spec.extra ?? {}),
+    actualCost: (price, outcome) => tokenCost(price, outcome.usage),
+  };
+}
+
 export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): Promise<ChatJsonResult<z.infer<S>>> {
   const spec = MODELS[opts.model];
   if (!spec) throw new Error(`Unknown model ${opts.model}`);
@@ -186,6 +196,7 @@ export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): P
       identity: { model: spec.model, promptVersion: opts.promptVersion, system: sha256(opts.system), user: sha256(userText), temperature, maxTokens, extra: spec.extra ?? null },
       requestSummary: { promptVersion: opts.promptVersion, systemHash: sha256(opts.system), userHash: sha256(userText), userChars: userText.length, temperature, maxTokens },
       attemptTag: opts.attemptTag,
+      money: chatMoney(spec, baseUrl, body),
     },
     async () => {
       const started = Date.now();
@@ -198,7 +209,7 @@ export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): P
           signal: AbortSignal.timeout(opts.timeoutMs ?? 120_000),
         });
       } catch (error) {
-        if (isConnectFailure(error)) throw new ProviderRejectedError(`connect failed: ${String(error)}`, null, true);
+        if (isConnectFailure(error)) throw new ProviderRejectedError(`connect failed: ${String(error)}`, null, true, { notBilled: true });
         throw error;
       }
       const text = await res.text();

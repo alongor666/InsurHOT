@@ -1,8 +1,11 @@
-// Jina Reader (r.jina.ai): browser-rendered page text. Paid per request, reached through the egress
-// proxy, always behind receipts and the per-minute/hour/day budget (any zero stops it).
+// Jina Reader (r.jina.ai): browser-rendered page text. Billed by the tokens of the page it returns,
+// reached through the egress proxy, always behind receipts, the per-minute/hour/day budget (any zero
+// stops it) and the monthly money limits. A request cannot say how large a page it will accept, so
+// the price row must carry a cap the provider itself enforces; without one every read is refused.
 import { credential } from "../config.ts";
 import { guardedFetch } from "../lib/http-fetch.ts";
-import { paidRequest, ProviderRejectedError } from "./receipts.ts";
+import { paidRequest, ProviderRejectedError, type MoneySpec } from "./receipts.ts";
+import { perUnitWorstCase, unitCost } from "./money.ts";
 
 export interface JinaPage {
   title: string | null;
@@ -17,6 +20,9 @@ export function parseJinaText(text: string): JinaPage {
   const field = (name: string) => new RegExp(`^${name}:\\s*(.+)$`, "m").exec(header)?.[1]?.trim() ?? null;
   return { title: field("Title"), url: field("URL Source"), publishedTime: field("Published Time"), markdown: body.trim() };
 }
+
+/** One price row, "reader": per returned token, up to the cap the row says the provider enforces. */
+export const jinaMoney = (baseUrl: string): MoneySpec => ({ priceKey: "reader", baseUrl, worstCase: perUnitWorstCase, actualCost: (price, outcome) => unitCost(price, outcome.usage?.tokens) });
 
 /**
  * Reads a page through Jina. The receipt key is the target URL plus the day, so a same-day retry of an
@@ -35,7 +41,10 @@ export async function jinaRead(
   const now = new Date().toISOString();
   const day = opts.perRead ? now : now.slice(0, 10);
   const receipt = await paidRequest(
-    { service: "jina", model: null, purpose: opts.purpose, subject: opts.subject, identity: { url: targetUrl, day, format: opts.format ?? "markdown" }, requestSummary: { url: targetUrl } },
+    {
+      service: "jina", model: null, purpose: opts.purpose, subject: opts.subject, identity: { url: targetUrl, day, format: opts.format ?? "markdown" }, requestSummary: { url: targetUrl },
+      money: jinaMoney(base),
+    },
     async () => {
       const res = await guardedFetch(`${base}/${targetUrl}`, {
         headers: { authorization: `Bearer ${key}`, "x-return-format": opts.format ?? "markdown", accept: "text/plain", ...tolerance },
@@ -47,11 +56,10 @@ export async function jinaRead(
       }
       if (res.status === 429 || res.status >= 500) throw new ProviderRejectedError(`jina HTTP ${res.status}`, res.status, true);
       const text = res.text();
-      // Billed in tokens; estimated at about ¥0.36 per million (a recharge-pack price). Without the usage
-      // header nothing is guessed.
+      // Billed in tokens; the cost comes from the approved price row. Without the usage header nothing is
+      // guessed and the reservation stays.
       const tokens = Number(res.headers.get("x-usage-tokens")) || null;
-      const cost = tokens ? { amount: (tokens / 1e6) * 0.36, currency: "CNY", basis: "estimated" as const } : null;
-      return { response: { text: text.slice(0, 2_000_000), status: res.status }, requestId: res.headers.get("x-request-id"), usage: { bytes: res.body.length, tokens }, cost };
+      return { response: { text: text.slice(0, 2_000_000), status: res.status }, requestId: res.headers.get("x-request-id"), usage: { bytes: res.body.length, tokens }, cost: null };
     },
   );
   const raw = String((receipt.response as { text?: string })?.text ?? "");

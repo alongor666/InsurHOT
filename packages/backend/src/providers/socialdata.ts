@@ -1,7 +1,8 @@
 // SocialData (X search). Paid per request: every call goes through receipts and the budget.
 import { credential } from "../config.ts";
 import { guardedFetch } from "../lib/http-fetch.ts";
-import { paidRequest, ProviderRejectedError } from "./receipts.ts";
+import { paidRequest, ProviderRejectedError, type MoneySpec } from "./receipts.ts";
+import { perUnitWorstCase, unitCost } from "./money.ts";
 
 export interface SdUser {
   name: string;
@@ -44,12 +45,13 @@ export interface SearchResult {
 }
 
 /**
- * SocialData bills US$0.20 per 1,000 objects returned by a successful response. Recorded per call as an
- * estimate.
+ * SocialData bills per object returned by a successful response. The unit price and the most objects
+ * one request of each endpoint can return come from the approved price row; a search cannot say how
+ * many posts it will take, so without a cap the provider enforces the row refuses.
  */
-function objectsCost(objects: number) {
-  return { amount: objects * 0.0002, currency: "USD", basis: "estimated" as const };
-}
+export const socialdataMoney = (endpoint: "search" | "article" | "tweet", baseUrl: string = apiBase()): MoneySpec => ({
+  priceKey: endpoint, baseUrl, worstCase: perUnitWorstCase, actualCost: (price, outcome) => unitCost(price, outcome.usage?.objects),
+});
 
 /** The API root; tests point it at a local stub. */
 function apiBase(): string {
@@ -65,7 +67,7 @@ export async function searchTweets(query: string, opts: { purpose: string; subje
   if (!key) throw new Error("SOCIALDATA_API_KEY is not configured");
   const type = opts.type ?? "Latest";
   const receipt = await paidRequest(
-    { service: "socialdata", purpose: opts.purpose, subject: opts.subject, identity: { query, type, cursor: opts.cursor ?? null, window: opts.window }, requestSummary: { query, type } },
+    { service: "socialdata", purpose: opts.purpose, subject: opts.subject, identity: { query, type, cursor: opts.cursor ?? null, window: opts.window }, requestSummary: { query, type }, money: socialdataMoney("search") },
     async () => {
       const sp = new URLSearchParams({ query, type });
       if (opts.cursor) sp.set("cursor", opts.cursor);
@@ -83,7 +85,7 @@ export async function searchTweets(query: string, opts: { purpose: string; subje
       if (res.status === 429 || res.status >= 500) throw new ProviderRejectedError(`socialdata HTTP ${res.status}`, res.status, true);
       const json = JSON.parse(text) as { tweets?: SdTweet[]; next_cursor?: string | null };
       const tweets = json.tweets?.length ?? 0;
-      return { response: json, usage: { tweets }, cost: objectsCost(tweets) };
+      return { response: json, usage: { tweets, objects: tweets }, cost: null };
     },
   );
   const json = receipt.response as { tweets?: SdTweet[]; next_cursor?: string | null };
@@ -122,7 +124,7 @@ export async function getArticle(tweetId: string, opts: { purpose: string; subje
   const key = credential("collectors", "SOCIALDATA_API_KEY");
   if (!key) throw new Error("SOCIALDATA_API_KEY is not configured");
   const receipt = await paidRequest(
-    { service: "socialdata", purpose: opts.purpose, subject: opts.subject, identity: { article: tweetId }, requestSummary: { article: tweetId } },
+    { service: "socialdata", purpose: opts.purpose, subject: opts.subject, identity: { article: tweetId }, requestSummary: { article: tweetId }, money: socialdataMoney("article") },
     async () => {
       const res = await guardedFetch(`${apiBase()}/twitter/article/${encodeURIComponent(tweetId)}`, {
         headers: { authorization: `Bearer ${key}`, accept: "application/json" },
@@ -131,7 +133,7 @@ export async function getArticle(tweetId: string, opts: { purpose: string; subje
         route: "direct",
       });
       const text = res.text();
-      if (res.status === 404) return { response: null, usage: { articles: 0 }, cost: null };
+      if (res.status === 404) return { response: null, usage: { articles: 0, objects: 0 }, cost: null };
       if (res.status === 402 || res.status === 401 || res.status === 403 || res.status === 400 || res.status === 422) {
         throw new ProviderRejectedError(`socialdata HTTP ${res.status}: ${text.slice(0, 200)}`, res.status, false);
       }
@@ -139,7 +141,7 @@ export async function getArticle(tweetId: string, opts: { purpose: string; subje
       // A post without an article answers with the post alone, or with {status: "error"}.
       const json = JSON.parse(text) as { article?: SdArticle; status?: string };
       const article = json.status === "error" ? null : (json.article ?? null);
-      return { response: article, usage: { articles: article ? 1 : 0 }, cost: objectsCost(1) };
+      return { response: article, usage: { articles: article ? 1 : 0, objects: 1 }, cost: null };
     },
   );
   return (receipt.response as SdArticle | null) ?? null;
@@ -150,7 +152,7 @@ export async function getTweet(id: string, opts: { purpose: string; subject: str
   const key = credential("collectors", "SOCIALDATA_API_KEY");
   if (!key) throw new Error("SOCIALDATA_API_KEY is not configured");
   const receipt = await paidRequest(
-    { service: "socialdata", purpose: opts.purpose, subject: opts.subject, identity: { tweet: id }, requestSummary: { tweet: id } },
+    { service: "socialdata", purpose: opts.purpose, subject: opts.subject, identity: { tweet: id }, requestSummary: { tweet: id }, money: socialdataMoney("tweet") },
     async () => {
       const res = await guardedFetch(`${apiBase()}/twitter/tweets/${encodeURIComponent(id)}`, {
         headers: { authorization: `Bearer ${key}`, accept: "application/json" },
@@ -159,12 +161,12 @@ export async function getTweet(id: string, opts: { purpose: string; subject: str
         route: "direct",
       });
       const text = res.text();
-      if (res.status === 404) return { response: null, usage: { tweets: 0 }, cost: null };
+      if (res.status === 404) return { response: null, usage: { tweets: 0, objects: 0 }, cost: null };
       if (res.status === 402 || res.status === 401 || res.status === 403 || res.status === 400 || res.status === 422) {
         throw new ProviderRejectedError(`socialdata HTTP ${res.status}: ${text.slice(0, 200)}`, res.status, false);
       }
       if (res.status === 429 || res.status >= 500) throw new ProviderRejectedError(`socialdata HTTP ${res.status}`, res.status, true);
-      return { response: JSON.parse(text) as SdTweet, usage: { tweets: 1 }, cost: objectsCost(1) };
+      return { response: JSON.parse(text) as SdTweet, usage: { tweets: 1, objects: 1 }, cost: null };
     },
   );
   return (receipt.response as SdTweet | null) ?? null;

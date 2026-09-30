@@ -56,7 +56,7 @@ test("all paid requests reject before DB or callback even with opt-in flags", as
   try {
     for (const value of [undefined, "false", "invalid", "true"]) {
       if (value === undefined) delete process.env.MODEL_CALLS_ENABLED; else process.env.MODEL_CALLS_ENABLED = value;
-      await assert.rejects(paidRequest({ service: "any-provider", purpose: "manual", identity: {} }, async () => { providerCalls++; return { response: {} }; }), PaidOutboundDisabledError);
+      await assert.rejects(paidRequest({ service: "any-provider", purpose: "manual", identity: {}, money: { priceKey: "any", baseUrl: "http://127.0.0.1:1", worstCase: () => { providerCalls++; return 0; } } }, async () => { providerCalls++; return { response: {} }; }), PaidOutboundDisabledError);
     }
     process.env.MODEL_CALLS_ENABLED = "true";
     process.env.EMBEDDINGS_ENABLED = "true";

@@ -59,7 +59,11 @@ const reserve = async (amount: number, over: Over = {}) => {
   await sql.begin((tx) => reserveMoney(tx, id, res(amount, over)));
   return id;
 };
-const settle = (id: number, s: Parameters<typeof settleMoney>[2]) => sql.begin((tx) => settleMoney(tx, id, s));
+/** Settles and returns the result without its `figure`, which has a case of its own. */
+const settle = async (id: number, s: Parameters<typeof settleMoney>[2]) => {
+  const { figure: _figure, ...rest } = await sql.begin((tx) => settleMoney(tx, id, s));
+  return rest;
+};
 async function used(scope: string, key: string, currency = "CNY"): Promise<number> {
   const [row] = await sql<{ amount: number }[]>`
     SELECT amount FROM money_usage WHERE scope = ${scope} AND key = ${key} AND currency = ${currency} AND month = ${budgetMonth(at)}`;
@@ -397,6 +401,20 @@ test("settlement: the actual cost replaces the reservation; without a usable fig
   assert.deepEqual(await settle(a, { kind: "hold" }), { counted: 0.5, ...none });
   assert.equal(await used("global", ""), 0.5 * 6);
   assert.equal(await used("subject", "article:a1"), 0.5 * 6);
+  await consistent();
+});
+
+test("the settlement result names the figure the ledger took, and none when it took none", async () => {
+  await standardLimits();
+  const figureOf = async (s: Parameters<typeof settleMoney>[2]) => {
+    const id = await reserve(0.5);
+    return (await sql.begin((tx) => settleMoney(tx, id, s))).figure;
+  };
+  assert.equal(await figureOf({ kind: "actual", amount: 0.2000001, currency: "CNY" }), 0.200001);
+  assert.equal(await figureOf({ kind: "actual", amount: 0.2, currency: "USD" }), null);
+  assert.equal(await figureOf({ kind: "actual", amount: -1, currency: "CNY" }), null);
+  assert.equal(await figureOf({ kind: "hold" }), null);
+  assert.equal(await figureOf({ kind: "release" }), null);
   await consistent();
 });
 

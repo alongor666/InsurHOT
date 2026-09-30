@@ -1,0 +1,23 @@
+✔ a refused request leaves no receipt or attempt behind: no price, no limit, no count budget (41.098083ms)
+✔ a claimed request holds its worst case on its own price row; while it is in flight the same request reserves nothing more (6.161792ms)
+✔ an answer settles at what its usage shows; without usage the reservation stays; a stored answer is reused for free (18.539875ms)
+✔ a failed call gives its money back only when the provider clearly did not take it (29.848625ms)
+✔ a retry after a failure is a new attempt with its own reservation; an unknown outcome is not retried (5.55025ms)
+✔ chat pricing: decided by the model's own row; reasoning, images and an unverified row refuse before anything is recorded (6.279583ms)
+✔ embeddings are priced by their text body on the model's row and have no subject limit (2.802625ms)
+✔ Dajiala: a per-request row for each endpoint; the provider's own figure counts, also with a refusal; only the rate limit is not billed (3.869834ms)
+✔ Jina and SocialData: refused without a cap the provider enforces; with one, reserved at the cap and settled by what came back (8.600458ms)
+✔ the cost written is the figure the ledger took; a usage that contradicts itself is no figure (3.8825ms)
+✔ an outcome that arrives late cannot reopen a receipt: only the attempt records it once the receipt has moved on (9.388416ms)
+✔ late settlements do not deadlock with the stale sweep or with a retry of the same receipt (63.882875ms)
+✔ simultaneous requests under one capability limit pass exactly as many as fit; claims, answers and failures at once do not deadlock (55.851875ms)
+✔ simultaneous requests of two services share the global limit and never exceed it together (15.767667ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 452.691542
+exit=0
