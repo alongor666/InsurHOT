@@ -14,16 +14,16 @@
 | 备份 | 文件名 `insurhot-<stamp>.dump`、`insurhot-files-<stamp>.tar.gz`；本地清理抽成 `pruneLocalBackups(dir)`，**同时按新旧前缀**保留每类最新 3 份（按时间戳排序，新旧名混排） |
 | 文档 | `docs/deploy.md` 的手工备份命令 |
 
-不改：`@aihot/*` 包名、`AIHOT_*` 环境变量、`_aihot` 数据键（第 3、4 步）；许可与来源记录类文件。
+不改：`@aihot/*` 包名、`AIHOT_*` 环境变量、`_aihot` 数据键（第 3、4 步）；许可与来源记录类文件。例外：G 类里的上游随附文档 `docs/deploy.md` 改了一行手工备份命令的库用户与库名（否则在新 compose 下跑不通），属运维同步，不是品牌改写。
 
-**已有数据卷的部署**要注意：compose 的库用户与库名改了，旧数据卷里的 `aihot` 库不会自动改名。当前没有任何部署，所以本 PR 不做迁移路径；将来若已有部署再改名，需先在库内建新角色/库或保留旧名。
+**已有数据卷的部署**要注意：compose 的项目名从 `aihot` 改为 `insurhot`，三个卷（`db`、`data`、`caddy`）没有显式 `name:`，卷名前缀随之从 `aihot_` 变为 `insurhot_`——旧卷不再挂载，compose 会新建空卷；库用户与库名也改了。当前没有任何部署，所以本 PR 不做迁移路径；将来若已有部署再改名，需先给卷写显式 `name:` 或迁移数据。
 
 ## 验证（本机，全新一次性库，42 个迁移）
 
 - `npm run typecheck`：通过（[日志](evidence/m0-4e-brand-step2-typecheck.log)）。
 - `npm run build -w @aihot/web`：通过；web 测试 11/11。
 - `bash scripts/test-unlocked.sh`：30 个文件，187/187（[日志](evidence/m0-4e-brand-step2-unlocked.log)）。新增 `tests/backup-prune.test.ts`：新旧前缀混合的 11 个文件，每类保留最新 3 份、其他文件不动、第二次运行不再删。
-- 构建产物里剩余的 `aihot` 字面量：只剩第 1 步（#32）范围内的下载文件名与 `links.aihot`。
+- 构建产物里剩余的 `aihot` 字面量都属于第 1 步（#32）的范围：`footerNote` 的「由 AIHOT 开源框架驱动」、`markdown.ts` 里的 `aihot.news` 域名正则、两个下载文件名；`links.aihot` 在后端产物里，不在 web 构建里。
 
 ## 未运行 / 未覆盖
 

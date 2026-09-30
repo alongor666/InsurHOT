@@ -11,16 +11,17 @@ import { pruneLocalBackups } from "@aihot/backend/operations/backup";
 test("the newest three of each kind stay, whichever prefix they carry; other files are not touched", async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "backup-prune-"));
   const names = [
-    "aihot-202609280400.dump", "aihot-202609290400.dump", "insurhot-202609300400.dump", "insurhot-202610010400.dump", "insurhot-202610020400.dump",
+    // A copy under the old name that is newer than some under the new name: the order is the stamp's, not the name's.
+    "aihot-202609280400.dump", "insurhot-202609290400.dump", "insurhot-202609300400.dump", "insurhot-202610010400.dump", "aihot-202610030400.dump",
     "aihot-files-202609280400.tar.gz", "aihot-files-202609290400.tar.gz", "aihot-files-202609300400.tar.gz", "insurhot-files-202610010400.tar.gz",
     "notes.txt", "aihot-1999-old-format.dump",
   ];
   for (const n of names) writeFileSync(path.join(dir, n), n);
   const removed = await pruneLocalBackups(dir);
-  assert.deepEqual(removed.sort(), ["aihot-202609280400.dump", "aihot-202609290400.dump", "aihot-files-202609280400.tar.gz"]);
+  assert.deepEqual(removed.sort(), ["aihot-202609280400.dump", "aihot-files-202609280400.tar.gz", "insurhot-202609290400.dump"]);
   assert.deepEqual(readdirSync(dir).sort(), [
-    "aihot-1999-old-format.dump", "aihot-files-202609290400.tar.gz", "aihot-files-202609300400.tar.gz", "insurhot-202609300400.dump", "insurhot-202610010400.dump",
-    "insurhot-202610020400.dump", "insurhot-files-202610010400.tar.gz", "notes.txt",
+    "aihot-1999-old-format.dump", "aihot-202610030400.dump", "aihot-files-202609290400.tar.gz", "aihot-files-202609300400.tar.gz", "insurhot-202609300400.dump",
+    "insurhot-202610010400.dump", "insurhot-files-202610010400.tar.gz", "notes.txt",
   ]);
   assert.deepEqual(await pruneLocalBackups(dir), [], "a second pass removes nothing more");
 });
