@@ -1,0 +1,22 @@
+✔ literal opt-in denies default, false and invalid values before storage (74.171666ms)
+✔ dedicated valid token required before storage; old ingest token cannot authorize (21.273124ms)
+✔ receipt and isolated payload preserve server observation, source and Dot times; HTML remains data (10.593252ms)
+✔ same content with changed key order duplicates; changed content conflicts, first seen preserved (9.361467ms)
+✔ strict full-batch validation rejects unsafe or unrecognized data before storage (12.320132ms)
+✔ HTTP body limit and malformed JSON return stable no-store errors without storage (4.080164ms)
+✔ storage failures do not disclose data, tokens or database errors (5.756328ms)
+✔ maximum batch accepts nullable source date without promoting it into server timestamps (3.735885ms)
+(node:5) [FSTDEP023] FastifyDeprecation: disableRequestLogging option is deprecated. Use the logController option with disableRequestLogging or isLogDisabled override instead. The disableRequestLogging top-level option will be removed in `fastify@6`.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"level":40,"time":1790750662606,"pid":5,"hostname":"ad740b1e4a59","reqId":"196fe87f-ff90-407f-92cb-c5a61dbef475","method":"POST","path":"/api/ingest/dot","status":503,"ms":1,"msg":"request"}
+✔ application registers Dot endpoint and disabled intake performs no SQL transaction (846.181387ms)
+✔ every persisted string rejects NUL and lone high/low surrogates before repository access (34.282442ms)
+✔ well-formed emoji survive validation and persistence as exact original text (2.279773ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1043.699459
