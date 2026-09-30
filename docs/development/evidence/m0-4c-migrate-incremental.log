@@ -4,6 +4,8 @@ INSERT 0 2
 INSERT 0 2
 INSERT 0 2
 INSERT 0 1
+INSERT 0 1
+alerts.state keys: budget.day.jina, budget.day.socialdata, provider.refused.socialdata
 sources: r1=rss/true, x1=x_search/true
 publications: ar=news, ax=x
 budgets: dajiala, dashscope, deepseek, embedding, jina, llm, mimo, socialdata, zhipu
@@ -18,6 +20,8 @@ articles columns x_post/x_article left: 0
 publications: ar=news/public/一篇文章, ax=news/public/一条帖子
 quote_translations table left: 0
 budgets: dajiala, dashscope, deepseek, embedding, jina, llm, mimo, zhipu
+alerts.state keys: budget.day.jina
+icon_checked_at set: r1=false, x1=true
 publications_channel_check: CHECK ((channel = 'news'::text))
 sources_kind_check: CHECK ((kind = ANY (ARRAY['rss'::text, 'web_list'::text, 'json_list'::text, 'mp_account'::text, 'external'::text])))
 $ node scripts/migrate.ts   # again

@@ -3,12 +3,13 @@
 # switch may open it (AGENTS.md: paid calls stay off; tests use local stubs, and these stubs are never
 # reached). scripts/test-unlocked.sh excludes them; they stay in the repository as the upstream
 # behaviour record and come back file by file as M0.3b lands. Refs #10, #11, docs/development/m0-pg-verification.md.
-# Files with a mix of paid and free cases (analyze, receipts, collection, source-rules) are not here: their paid cases are
-# named in tests/paid-lock-blocked-cases.txt so the free ones keep running.
+# Files with a mix of paid and free cases (analyze, receipts, source-rules) are not here: their paid cases are
+# named in tests/paid-lock-blocked-cases.txt so the free ones keep running. collection, whose one remaining case is
+# paid, is listed there too.
 # Format: one path per line; text after '#' is the reason. Counts are failing/total cases in the file.
 tests/analyze-shutdown.test.ts   # 3/3 set MODEL_CALLS_ENABLED=true themselves; the paid lock still stops the call (120s timeouts)
 tests/default-model.test.ts      # 1/1 model calls
 tests/events.test.ts             # 10/10 model calls (grouping/report decisions)
-tests/signals.test.ts            # 3/3 model calls
-tests/translate.test.ts          # 3/3 model calls
+tests/signals.test.ts            # 2/2 model calls
+tests/translate.test.ts          # 2/2 model calls
 tests/translate-shutdown.test.ts # 2/2 set MODEL_CALLS_ENABLED=true themselves; the paid lock still stops the call

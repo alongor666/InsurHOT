@@ -1,6 +1,6 @@
 // Source icons ("来源图标缓存"): the face a source shows next to its reports and on the hot list.
-// X accounts take the avatar on their latest post; 公众号 the account avatar on their latest article
-// page; sites the best icon their home page declares. A source with none keeps its tinted initial.
+// 公众号 take the account avatar on their latest article page; sites the best icon their home page
+// declares. A source with none keeps its tinted initial.
 import { sql } from "../db.ts";
 import { guardedFetch, DEFAULT_UA } from "../lib/http-fetch.ts";
 import { produceImage } from "../media/images.ts";

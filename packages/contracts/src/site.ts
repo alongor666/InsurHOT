@@ -171,7 +171,7 @@ export interface ProblemBody {
 export interface HotParticipant {
   name: string;
   kind: "editorial" | "signal";
-  /** The source's icon, or for an X account its latest collected avatar (proxied). */
+  /** The source's icon (proxied). */
   iconUrl: string | null;
   iconSrcSet?: string;
 }

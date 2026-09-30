@@ -48,10 +48,12 @@
 | `articles.x_post`、`articles.x_article` | 删列 |
 | `quote_translations` | 删表 |
 | `budgets` 的 `socialdata` 行 | 删除 |
+| `settings` 的 `alerts.state` | 去掉 `budget.day.socialdata`、`provider.refused.socialdata` 两个键（若在报警中）。预算行删掉后这两个问题不会再被检查出来，不清的话下一次告警检查会发两条假的「已恢复」（评审第 1 轮 F1，做法同 0042） |
+| 原 X 信源的 `icon_checked_at` | 置为迁移时刻。图标任务不再按类型跳过这些行，不置的话它会去 x.com 首页找图标（评审 F3）；30 天后仍会重查一次，属已知残留 |
 
 不可自动回退：删掉的两列就是帖子原文本身。删除前的定义与行数记录在 [`m0-4c-dropped-ddl.sql`](evidence/m0-4c-dropped-ddl.sql)（main `465a3d8` 的全新库：全部为 0 行，`budgets` 的 `socialdata` 行是迁移 0022 预置的）。没有改写任何历史迁移文件。
 
-没有动的库内对象：`service_prices`、`money_budgets`、`money_usage` 里可能存在的 SocialData 行（默认为空；价格与限额是 owner 批准的记录，不由迁移删除）；`receipts` 与 `receipt_attempts` 的历史行；pg-boss 里可能残留的 `sources.fetch-x` 队列（不再有消费者）。
+没有动的库内对象：`service_prices`、`money_budgets`、`money_usage` 里可能存在的 SocialData 行（默认为空；价格与限额是 owner 批准的记录，不由迁移删除）；`receipts` 与 `receipt_attempts` 的历史行；pg-boss 里可能残留的 `sources.fetch-x` 队列（不再有消费者；若里面还有等待中的任务，按 `operations/alerts.ts` 的排队检查，它会每天在系统日报里出现一次「后台任务排队超过 2 小时」，直到 pg-boss 按保留期清掉——这是读代码的推断，保留期未实测；当前没有已部署实例，全新库迁移时还没有 `pgboss` schema，所以没有在迁移里删）。
 
 ## 对外行为的变化
 
@@ -93,17 +95,20 @@
 - `removed-modules.test.ts` 加 2 个用例：多 2 个。
 - 合计 151 − 3 − 1 + 2 = 149 个，26 个文件，跳过 15 − 4 = 11 条。
 
-**迁移作用在旧库上**：先用 main 的迁移建库（39 个），写入一个 `x_search` 信源和一个 RSS 信源、各一篇文章（X 那篇带 `x_post` 与 `x_article`）、各一条 publication（`x` 与 `news`）、一条引文翻译，再跑迁移。结果：X 信源变为 `external/停用/paused`、配置与游标清空，RSS 信源原样；两篇文章都在，两列消失；两条 publication 都是 `news` 且仍 `public`；引文翻译表消失；`budgets` 少了 `socialdata`；两个 CHECK 是收窄后的定义；再跑一次迁移报告 up to date。
+**迁移作用在旧库上**：先用 main 的迁移建库（39 个），写入一个 `x_search` 信源和一个 RSS 信源、各一篇文章（X 那篇带 `x_post` 与 `x_article`）、各一条 publication（`x` 与 `news`）、一条引文翻译，再跑迁移。结果：X 信源变为 `external/停用/paused`、配置与游标清空，RSS 信源原样；两篇文章都在，两列消失；两条 publication 都是 `news` 且仍 `public`；引文翻译表消失；`budgets` 少了 `socialdata`；预置在 `alerts.state` 里的两个 SocialData 键被去掉、Jina 的键保留；原 X 信源的 `icon_checked_at` 已置、RSS 信源没有；两个 CHECK 是收窄后的定义；再跑一次迁移报告 up to date。
+
+**非 X 文章的编辑输入不变（作者对照，不是独立评审）**：同 4 类非 X 材料（有正文、只有摘要加译文、只有标题、external）在 main `465a3d8`（`xPost: null`）与本分支上各跑一遍 `buildMaterial`、`renderContext`、`prefilterUser`、`understandUser`、`buildScoreInput`、`buildArticlePrompt`、`missingEvidence`、`waitsForPage`、`finalizeCopy`，输出逐字节相同；唯一差别是 `TranslateInput` 少了三个帖子专用字段（`mainText`、`quotedText`、`quotedAuthor`，main 上对文章恒为 undefined）。评审第 1 轮独立重做了同类对照（11 个函数，结果一致）。它只覆盖纯函数，不覆盖要调模型的路径。
 
 **测试的区分力**：`removed-modules.test.ts` 新增的库结构用例在 main 的库结构（39 个迁移）上失败，其余 5 个通过；迁到 0043 后全部通过。`channel=x` 返回 400 的断言对应 contracts 里 `CHANNEL_KEYS` 的改动（main 上该请求是 200）。
 
 **worker**：本机启动后正常报告 started 并可正常停止。
 
-残留搜索：`grep -rn -i "x_post\|xPost\|x_search\|x_article\|quote_translation\|socialdata\|tweet\|twitter\|translate_quoted\|引用帖\|推特" apps packages scripts industry tests reference .env.example`（排除构建产物）只剩上文「没有动的」列出的三处通用 URL/元标签代码，以及 `removed-modules.test.ts` 自身。
+残留搜索：`grep -rn -i "x_post\|xPost\|x_search\|x_article\|quote_translation\|socialdata\|tweet\|twitter\|translate_quoted\|引用帖\|推特" apps packages scripts industry tests reference .env.example`（排除构建产物）只剩上文「没有动的」列出的三处通用 URL/元标签代码，以及 `removed-modules.test.ts` 自身。这个正则不覆盖「X account / X posts」这类写法：评审第 1 轮据此找到 `content/sanitize.ts` 里已无调用方的 `textToHtml` 和两处过期注释（`sources/icons.ts`、`contracts/src/site.ts`），已删除或改正。
 
 ## 未运行
 
 - **被付费闭锁挡住的测试**：本 PR 改了 `analyze.test.ts`、`signals.test.ts`、`translate.test.ts`、`translate-shutdown.test.ts`、`collection.test.ts` 里的用例（删掉 X 专用的，改了一个用例名与一处期望值）。这些用例在闭锁清单里，运行不了，只过了 typecheck；它们改后是否仍与实现一致，要到闭锁解除（M0.3b 之后）才能实测。对应的实现改动（摘要只剩文章提示词、翻译只剩正文分支、归组去掉引用路径）因此没有运行时证据，只有类型检查与代码审阅。
+- `tests/paid-wiring.test.ts` 的超限用例由 SocialData 改写为 Jina 后，原用例里「每个端点有自己的价格行，缺行即 `missing_price`」这条断言随 SocialData 一起没有了，没有为 Jina 补等价断言（评审 F6，记录在案）。
 - Docker 镜像内的构建与冒烟（本机无 Docker；M0.5 #13）。
 - 登录后台后的页面（新建信源表单、运行页）：未创建管理员账号，只做了 typecheck 与构建；后台新建 `x_search` 被拒由测试直接调 `createSource` 验证。
 - `scripts/eval-selection.ts` 改了两行（不再把 `x_search` 的金标用例当帖子）：脚本不在 typecheck 范围内，也需要模型调用，未运行。
