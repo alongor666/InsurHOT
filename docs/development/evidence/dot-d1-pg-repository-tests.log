@@ -1,0 +1,15 @@
+✔ a delivery is stored once with its items; a repeat returns the first receipt and writes nothing (28.255583ms)
+✔ changed content under a stored delivery id is a conflict and leaves the stored batch untouched (5.099792ms)
+✔ simultaneous first deliveries of one id store one batch; every caller gets the same first receipt (17.784125ms)
+✔ simultaneous deliveries of one id with different content: one is stored, the others conflict (6.48425ms)
+✔ a batch whose item the database refuses is rolled back whole (7.734625ms)
+✔ deleting a delivery removes its items; the intake tables reference nothing outside themselves (6.302334ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 338.807875
+exit=0

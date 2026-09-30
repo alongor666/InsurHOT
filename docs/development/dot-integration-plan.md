@@ -27,7 +27,7 @@ D1不会调用旧`/api/ingest/items`：旧`ingestItems`接收后会自动`queueP
 
 | 阶段 | 产出 | 实际通过条件 | 当前状态/依赖 |
 |---|---|---|---|
-| D1 接收端 | v1合同；POST `/api/ingest/dot`；独立token；`dot_deliveries`/`dot_items`；幂等回执 | 本地HTTP/service检查；typecheck/web build；独立工程评审；真实PG迁移/回滚/并发在可运行环境验收 | 已实现，独立分支`codex/dot-intake-contract` stacked on PR #7；PG未运行，保持Draft |
+| D1 接收端 | v1合同；POST `/api/ingest/dot`；独立token；`dot_deliveries`/`dot_items`；幂等回执 | 本地HTTP/service检查；typecheck/web build；独立工程评审；真实PG迁移/回滚/并发在可运行环境验收 | 已实现；HTTP/service 检查与真实 PostgreSQL（迁移 0039、幂等、409、并发、整批回滚）均已通过，见 [D1证据](dot-d1-evidence.md)；取代 PR #9 的新 PR 待独立评审与合并 |
 | D2 Dot交付通道 | Dot责任说明、`submit_dot_batch`工具或受控文件交付桥、连接台账 | 实际账户可用连接；专用凭据仅服务端保管；收到一批真实Dot数据并记录deliveryId/服务器回执；重复提交不新增数据 | 未配置；先使用官方支持的实际应用/插件能力选择通道，不虚构API；本机通道需在线电脑 |
 | D3 产品呈现 | 私有分析读取与三支柱卡片；来源、事实/分析标记、更正撤回 | T2/T4同一证据和公开出口合同；固定HEAD工程验收；实际部署条件满足 | 未实现；依赖证据链、M0剩余项和G2 |
 

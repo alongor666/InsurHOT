@@ -23,7 +23,7 @@ Node v25.5.0（满足 `engines >=24.11`），`npm ci --ignore-scripts`。仅本�
 | `npm run build -w @aihot/web` | 客户端+SSR PASS，exit0 | [构建](evidence/dot-hardening-build.log) |
 | `git diff --check` | PASS，exit0 | 提交前执行 |
 | compose 缺密码拒绝启动 | **NOT RUN**：本机无 Docker；静态核对两处引用均为 `:?` 语法、无 `:-aihot` 残留 | 待 M0.5 Docker smoke |
-| PG 迁移、真实并发幂等、Docker、完整应用 CI | **NOT RUN**，与 #9 相同 | 见 #10、#13 |
+| PG 迁移、真实并发幂等 | 合入 #9 时 NOT RUN；其后已在取代 #9 的 PR 中补跑，见 [D1 证据](dot-d1-evidence.md)。Docker 仍 NOT RUN（#13） | — |
 
 新增限流用例：(1) 同一地址 60 次未授权请求均 401，第 61 次持有效 token 仍 429 且零存储，另一地址持有效 token 200；(2) `trustProxy: true` 下同一 socket 每次换一个不同的伪造 `X-Forwarded-For` 地址：前 300 次均 401，第 301 次起直到第 5050 次全部 429（跨过地址 Map 的 5000 键 `clear()` 边界），零存储——该用例在没有全局上限、全局计数随 Map 一起清零、或未开 trustProxy 时都会失败。日志中主机名与本地路径已脱敏。
 
