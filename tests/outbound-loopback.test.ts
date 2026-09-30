@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import { test } from "node:test";
 // Static imports are hoisted above the env assignments; config reads the env when it loads.
-const { assertLoopbackUrl, isLoopbackHost, outboundFetch } = await import("@aihot/backend/outbound-policy");
+const { FETCH_TEST_DOUBLE, assertLoopbackUrl, isLoopbackHost, outboundFetch } = await import("@aihot/backend/outbound-policy");
 const { guardedFetch } = await import("@aihot/backend/lib/http-fetch");
 const { loopbackLookup } = await import("@aihot/backend/lib/url");
 
@@ -40,13 +40,19 @@ test("guarded collection reaches a local stub but refuses a public name and a re
   } finally { await Promise.all([away.close(), local.close()]); }
 });
 
-test("direct integrations refuse non-loopback targets before calling fetch, unless fetch is a test double", async () => {
+test("direct integrations refuse non-loopback targets before calling fetch, unless fetch is a marked test double", async () => {
   await assert.rejects(outboundFetch("collect", "http://example.com/v1"), /OUTBOUND_LOOPBACK_ONLY/);
   await assert.rejects(outboundFetch("collect", new URL("http://198.51.100.1/")), /OUTBOUND_LOOPBACK_ONLY/);
-  // tests/feedback.test.ts replaces globalThis.fetch for open.feishu.cn; a double is not the network.
   const real = globalThis.fetch;
   let seen = "";
-  globalThis.fetch = (async (input: string | URL | Request) => { seen = String(input); return new Response("{}", { status: 200 }); }) as typeof fetch;
+  const double = (async (input: string | URL | Request) => { seen = String(input); return new Response("{}", { status: 200 }); }) as typeof fetch;
+  // An unmarked replacement is still checked (fail-closed) ...
+  globalThis.fetch = double;
+  try { await assert.rejects(outboundFetch("collect", "https://open.feishu.cn/open-apis/x"), /OUTBOUND_LOOPBACK_ONLY/); assert.equal(seen, ""); }
+  finally { globalThis.fetch = real; }
+  // ... a marked one is the test's own answer, not the network (tests/feedback.test.ts).
+  Object.assign(double, { [FETCH_TEST_DOUBLE]: true });
+  globalThis.fetch = double;
   try {
     const res = await outboundFetch("collect", "https://open.feishu.cn/open-apis/x");
     assert.equal(res.status, 200); assert.equal(seen, "https://open.feishu.cn/open-apis/x");

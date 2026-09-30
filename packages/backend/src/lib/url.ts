@@ -188,10 +188,6 @@ export async function assertPublicUrl(url: string, allowPrivate = false, proxied
 
 type LookupCallback = (err: NodeJS.ErrnoException | null, address: string | Array<{ address: string; family: number }>, family?: number) => void;
 
-/**
- * DNS lookup for outbound sockets that refuses blocked addresses. Used as the connect-time lookup,
- * it closes the gap between the URL check and the connection (DNS rebinding).
- */
 /** Connect-time counterpart of assertLoopbackUrl: the dialled address itself must be loopback. */
 export function loopbackLookup(hostname: string, options: { all?: boolean; family?: number } | number, callback: LookupCallback): void {
   const opts = typeof options === "number" ? { family: options } : options;
@@ -207,6 +203,10 @@ export function loopbackLookup(hostname: string, options: { all?: boolean; famil
   );
 }
 
+/**
+ * DNS lookup for outbound sockets that refuses blocked addresses. Used as the connect-time lookup,
+ * it closes the gap between the URL check and the connection (DNS rebinding).
+ */
 export function guardedLookup(hostname: string, options: { all?: boolean; family?: number } | number, callback: LookupCallback): void {
   const opts = typeof options === "number" ? { family: options } : options;
   if (blockedHostname(hostname.toLowerCase())) {
