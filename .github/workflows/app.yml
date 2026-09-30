@@ -70,7 +70,7 @@ jobs:
       - name: Server logs
         if: failure()
         run: tail -n 60 "$RUNNER_TEMP/api.log" "$RUNNER_TEMP/web.log" 2>/dev/null || true
-      - name: Dependency audit (report only until M0.5 decides the threshold)
+      - name: Dependency audit (report only; the threshold is not decided yet, Issue #13)
         continue-on-error: true
         run: npm audit --audit-level=high
 
