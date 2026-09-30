@@ -336,6 +336,94 @@ test("a file put under the same name while its predecessor is being sent is neit
   assert.deepEqual([counts(fourth), await stored(b), readFileSync(path.join(dir, "delivered", `${b}.json`), "utf8"), list(dir, "pending"), list(dir, ".aside")], [[1, 0, 0, 0, 0], { deliveries: 1, items: 1 }, bytes(b), [], []]);
 });
 
+test("the file that was sent is told from another by what it is, not by its name, size or time; one put back never writes over a file", async () => {
+  const dir = inbox();
+  const a = `d-${RUN}-same-a`, b = `d-${RUN}-same-b`, c = `d-${RUN}-same-c`;
+  assert.equal(JSON.stringify(batch(a)).length, JSON.stringify(batch(b)).length);
+  const when = new Date(Date.now() - 60_000);
+  const today = path.join(dir, "pending", "today.json");
+  const once = (act: () => void): typeof fetch => { let done = false; return (...args) => { if (!done) { done = true; act(); } return fetch(...args); }; };
+
+  // Replaced by another file of the same size with the same modification time: only the inode differs.
+  drop(dir, "today.json", batch(a));
+  utimesSync(today, when, when);
+  // As the file system stores it (it may not keep the millisecond exactly): B gets the very same time.
+  const stamped = lstatSync(today).mtimeMs;
+  const replaced = await run(dir, { fetchImpl: once(() => {
+    writeFileSync(`${today}.part`, JSON.stringify(batch(b)));
+    utimesSync(`${today}.part`, when, when);
+    renameSync(`${today}.part`, today);
+  }) });
+  assert.deepEqual([counts(replaced), JSON.parse(readFileSync(today, "utf8")).deliveryId, lstatSync(today).mtimeMs === stamped], [[1, 0, 0, 0, 0], b, true], "B, same size and same time as A, is still waiting");
+
+  // Rewritten in place (same inode, same size) at another time: not the bytes that were sent either.
+  rmSync(today);
+  drop(dir, "today.json", batch(b));
+  const inode = lstatSync(today).ino;
+  const rewritten = await run(dir, { fetchImpl: once(() => {
+    writeFileSync(today, JSON.stringify(batch(c)));
+    utimesSync(today, new Date(Date.now() - 120_000), new Date(Date.now() - 120_000));
+  }) });
+  assert.deepEqual([counts(rewritten), lstatSync(today).ino === inode, JSON.parse(readFileSync(today, "utf8")).deliveryId], [[1, 0, 0, 0, 0], true, c], "C is still waiting");
+  assert.deepEqual([(await stored(a)).deliveries, (await stored(b)).deliveries, (await stored(c)).deliveries], [1, 1, 0]);
+  assert.equal((await run(dir)).delivered, 1);
+
+  // A leftover of a killed run goes back under a name of its own when its usual name is taken.
+  writeFileSync(path.join(dir, "pending", "recovered-4242-0.json"), "a file that happens to have that name");
+  utimesSync(path.join(dir, "pending", "recovered-4242-0.json"), when, when);
+  writeFileSync(path.join(dir, ".aside", "4242-0"), JSON.stringify(batch(`d-${RUN}-same-left`)));
+  utimesSync(path.join(dir, ".aside", "4242-0"), when, when);
+  const recovered = await run(dir);
+  assert.deepEqual([recovered.delivered, recovered.rejected, (await stored(`d-${RUN}-same-left`)).deliveries], [1, 1, 1]);
+  assert.equal(readFileSync(path.join(dir, "rejected", "recovered-4242-0.json"), "utf8"), "a file that happens to have that name", "the file that had the name was not written over");
+  // What a bridge that is running right now has set aside is left to it.
+  writeFileSync(path.join(dir, ".aside", `${process.ppid}-0`), JSON.stringify(batch(`d-${RUN}-same-theirs`)));
+  await run(dir);
+  assert.deepEqual([list(dir, ".aside"), (await stored(`d-${RUN}-same-theirs`)).deliveries], [[`${process.ppid}-0`], 0]);
+});
+
+test("a link, a directory or a pipe under a batch's name is never followed, sent, put back or waited for; the bridge keeps working", async () => {
+  const dir = inbox();
+  const root = path.dirname(dir);
+  const secret = path.join(root, "secret.json");
+  writeFileSync(secret, JSON.stringify(batch(`d-${RUN}-secret`)));
+  utimesSync(secret, new Date(Date.now() - 60_000), new Date(Date.now() - 60_000));
+  const swaps: Array<[string, (file: string) => void]> = [
+    ["link", (file) => { unlinkSync(file); symlinkSync(secret, file); }],
+    ["dangling", (file) => { unlinkSync(file); symlinkSync(path.join(root, "nowhere.json"), file); }],
+    ["folder", (file) => { unlinkSync(file); mkdirSync(file); }],
+  ];
+  for (const [kind, swap] of swaps) {
+    const id = `d-${RUN}-swap-${kind}`;
+    const file = drop(dir, `${kind}.json`, batch(id));
+    let done = false;
+    const result = await run(dir, { fetchImpl: (...args) => { if (!done) { done = true; swap(file); } return fetch(...args); } });
+    // The batch that was sent is delivered and recorded as such; what took its place is set apart as the entry it is.
+    assert.deepEqual([counts(result), (await stored(id)).deliveries, ledger(dir).at(-1)!.outcome, list(dir, "pending"), list(dir, ".aside")], [[1, 0, 0, 0, 0], 1, "delivered", [], []], kind);
+    const apart = lstatSync(path.join(dir, "quarantine", `${kind}.json`));
+    assert.equal(kind === "folder" ? apart.isDirectory() : apart.isSymbolicLink(), true, kind);
+  }
+  // Later runs neither fail nor send what the link pointed at.
+  let sent = 0;
+  for (let k = 0; k < 2; k++) assert.deepEqual(counts(await run(dir, { fetchImpl: (...args) => { sent += 1; return fetch(...args); } })), [0, 0, 0, 0, 0]);
+  assert.deepEqual([sent, (await stored(`d-${RUN}-secret`)).deliveries, JSON.parse(readFileSync(secret, "utf8")).deliveryId, lstatSync(secret).nlink], [0, 0, `d-${RUN}-secret`, 1]);
+  assert.deepEqual(readdirSync(root).sort(), ["inbox", "secret.json"]);
+
+  // A pipe named like a batch: opened without waiting for a writer, seen not to be a file, skipped; the next file is delivered.
+  assert.equal(spawnSync("mkfifo", [path.join(dir, "pending", "a-pipe.json")]).status, 0);
+  drop(dir, "b.json", batch(`d-${RUN}-after-pipe`));
+  const piped = await run(dir);
+  assert.deepEqual([counts(piped), ledger(dir).filter((l) => l.file === "a-pipe.json").at(-1)!.error, (await stored(`d-${RUN}-after-pipe`)).deliveries], [[1, 0, 0, 0, 1], "not_a_file", 1]);
+
+  // A leftover in .aside that is not a plain file does not stop the run either.
+  symlinkSync(secret, path.join(dir, ".aside", "4243-0"));
+  mkdirSync(path.join(dir, ".aside", "4243-1"));
+  drop(dir, "c.json", batch(`d-${RUN}-after-leftovers`));
+  const after = await run(dir);
+  assert.deepEqual([after.delivered, list(dir, ".aside"), (await stored(`d-${RUN}-secret`)).deliveries, lstatSync(secret).nlink], [1, [], 0, 1]);
+  assert.ok(lstatSync(path.join(dir, "quarantine", "recovered-4243-0.json")).isSymbolicLink() && lstatSync(path.join(dir, "quarantine", "recovered-4243-1.json")).isDirectory());
+});
+
 test("archives, receipts and refusals never write over one another, whatever the ids and file names", async () => {
   const dir = inbox();
   // "x" and "x.receipt" are both valid delivery ids.

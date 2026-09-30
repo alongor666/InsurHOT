@@ -14,7 +14,9 @@
 //     (a plain file, its size, its age) is what is sent;
 //   - the archive is written from the bytes that were sent, never by moving whatever is at the path;
 //   - a pending file is taken away only after it is shown to be the very file that was sent (it is
-//     moved aside first and compared there); any other file found under that name goes back.
+//     moved aside first and compared there); another plain file found under that name goes back;
+//     anything else found there (a link, a directory, a pipe) is never followed, linked or put back:
+//     it is moved, as the directory entry it is, into <inbox>/quarantine for a person to look at.
 // Nothing here depends on the lock: two bridges on one inbox send the same bytes, the server stores
 // one batch, and each file step tolerates the other having done it already.
 // The token comes from the caller (the script reads DOT_INGEST_TOKEN) and is written nowhere.
@@ -174,8 +176,8 @@ export async function runDotBridge(options: BridgeOptions): Promise<BridgeSummar
   const send = options.fetchImpl ?? fetch;
   const inbox = path.resolve(options.inbox);
   const pending = path.join(inbox, "pending"), delivered = path.join(inbox, "delivered"), receipts = path.join(inbox, "receipts"),
-    rejected = path.join(inbox, "rejected"), aside = path.join(inbox, ".aside");
-  for (const dir of [inbox, pending, delivered, receipts, rejected, aside]) mkdirSync(dir, { recursive: true, mode: 0o700 });
+    rejected = path.join(inbox, "rejected"), aside = path.join(inbox, ".aside"), quarantine = path.join(inbox, "quarantine");
+  for (const dir of [inbox, pending, delivered, receipts, rejected, aside, quarantine]) mkdirSync(dir, { recursive: true, mode: 0o700 });
   const summary: BridgeSummary = { delivered: 0, duplicate: 0, rejected: 0, retry: 0, skipped: 0 };
   const unlock = options.skipLock ? () => {} : lock(path.join(inbox, ".lock"), now());
   if (!unlock) return { ...summary, stopped: "locked" };
@@ -186,25 +188,42 @@ export async function runDotBridge(options: BridgeOptions): Promise<BridgeSummar
     appendFileSync(path.join(inbox, "ledger.jsonl"), `${JSON.stringify(full)}\n`, { mode: 0o600 });
   };
 
-  /** Back into pending without writing over anything there: under its name, or a variant of it that still ends in .json. */
+  /** Out of the way for good, as the directory entry it is (a link is moved, not followed): for a person to look at. */
+  const setApart = (from: string, name: string) => {
+    renameSync(from, path.join(quarantine, freeName(quarantine, name, now())));
+  };
+  /**
+   * A plain file in .aside goes back into pending without writing over anything there: under its name,
+   * or a variant of it that still ends in .json. Only ever called for a plain file: a hard link to a
+   * symbolic link would, on some systems, be a link to what it points at. What cannot be linked back
+   * (a file system without hard links) is set apart instead.
+   */
   const putBack = (from: string, name: string) => {
+    if (!lstatSync(from).isFile()) return setApart(from, name);
     const base = name.endsWith(".json") ? name.slice(0, -".json".length) : name;
-    for (let n = 0; ; n++) {
+    for (let n = 0; n < 1000; n++) {
       const target = n === 0 ? name : `${base}.returned-${now().toISOString().replace(/[:.]/g, "")}-${n}.json`;
       try {
         linkSync(from, path.join(pending, target));
-        unlinkSync(from);
-        return;
       } catch (error) {
-        if (codeOf(error) !== "EEXIST") throw error;
+        if (codeOf(error) === "EEXIST") continue;
+        return setApart(from, name);
       }
+      try {
+        unlinkSync(from);
+      } catch (error) {
+        if (codeOf(error) !== "ENOENT") throw error; // another run put the same leftover back first
+      }
+      return;
     }
+    setApart(from, name);
   };
   let asideSeq = 0;
   /**
    * Takes the pending file away if, and only if, it is the file that was read: it is moved aside in one
    * step and compared there. Returns where it now is; null when there is no such file any more, or when
-   * another file was found under the name (that one goes back, untouched, for the next run).
+   * something else was found under the name: another plain file goes back, untouched, for the next
+   * run; anything that is not a plain file is set apart.
    */
   const takeAway = (name: string, sent: Identity): string | null => {
     const parked = path.join(aside, `${process.pid}-${asideSeq++}`);
@@ -230,8 +249,17 @@ export async function runDotBridge(options: BridgeOptions): Promise<BridgeSummar
   };
 
   try {
-    // Files an earlier run had moved aside and did not finish with (it was killed): back into pending.
-    for (const left of readdirSync(aside)) putBack(path.join(aside, left), `recovered-${left}.json`);
+    // What an earlier run had moved aside and did not finish with (it was killed) goes back into pending.
+    // An entry of a bridge that is running right now is that bridge's business. No entry may end the run.
+    for (const left of readdirSync(aside)) {
+      const owner = Number(/^(\d+)-\d+$/.exec(left)?.[1]);
+      if (owner !== process.pid && Number.isInteger(owner) && owner > 0 && alive(owner)) continue;
+      try {
+        putBack(path.join(aside, left), `recovered-${left}.json`);
+      } catch (error) {
+        if (codeOf(error) !== "ENOENT") record({ file: `.aside/${left}`, outcome: "skipped", error: `local_${codeOf(error)}` });
+      }
+    }
     // Only plain .json files directly in pending, by name. A producer writes "<name>.json.part" and renames it when complete.
     const names = readdirSync(pending).filter((n) => n.endsWith(".json") && !n.startsWith(".")).sort();
     for (let i = 0; i < names.length; i++) {
@@ -241,7 +269,8 @@ export async function runDotBridge(options: BridgeOptions): Promise<BridgeSummar
         // Opened without following a link, and judged and read through this one descriptor.
         let fd: number;
         try {
-          fd = openSync(path.join(pending, name), constants.O_RDONLY | constants.O_NOFOLLOW);
+          // Non-blocking, so that a pipe under a batch's name is opened at once and then seen not to be a file.
+          fd = openSync(path.join(pending, name), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
         } catch (error) {
           const code = codeOf(error);
           if (code === "ENOENT") continue; // gone since the listing: taken by another run, or withdrawn
@@ -324,10 +353,16 @@ export async function runDotBridge(options: BridgeOptions): Promise<BridgeSummar
           if (!writeNew(archive, body) && answer.status === "received" && !readFileSync(archive).equals(body)) {
             writeNew(path.join(delivered, freeName(delivered, `${deliveryId}.json`, now())), body);
           }
-          // Only now, and only if it is still that file, does the pending file go.
-          const parked = takeAway(name, sent);
-          if (parked) unlinkSync(parked);
-          record({ file: name, deliveryId, outcome: answer.status === "received" ? "delivered" : "duplicate", httpStatus: status, receivedAt: receipt.receivedAt, firstSeenAt: receipt.firstSeenAt, itemCount: receipt.itemCount });
+          // Only now, and only if it is still that file, does the pending file go. The delivery is a fact
+          // whatever happens to the local clean-up: a failure there is noted, not reported as a retry.
+          let cleanup: string | null = null;
+          try {
+            const parked = takeAway(name, sent);
+            if (parked) unlinkSync(parked);
+          } catch (error) {
+            cleanup = `local_${codeOf(error)}`;
+          }
+          record({ file: name, deliveryId, outcome: answer.status === "received" ? "delivered" : "duplicate", httpStatus: status, receivedAt: receipt.receivedAt, firstSeenAt: receipt.firstSeenAt, itemCount: receipt.itemCount, error: cleanup });
           continue;
         }
         if (REFUSED_FOR_GOOD.has(status)) {
