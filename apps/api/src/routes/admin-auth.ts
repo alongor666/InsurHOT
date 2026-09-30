@@ -59,6 +59,7 @@ export function adminHandler(fn: AdminHandler) {
       if ((error as { statusCode?: number }).statusCode === 400 || error instanceof SyntaxError) {
         return sendProblem(req, reply, { status: 400, code: "invalid_request", detail: String((error as Error).message).slice(0, 300) });
       }
+      if ((error as { statusCode?: number }).statusCode === 403) return sendProblem(req, reply, { status: 403, code: "forbidden", detail: String((error as Error).message).slice(0, 300) });
       if ((error as { code?: string }).code === "conflict") return sendProblem(req, reply, { status: 409, code: "conflict", detail: (error as Error).message });
       req.log.error({ err: error, path: req.url.split("?")[0] }, "admin api error");
       return sendProblem(req, reply, { status: 500, code: "internal_error", detail: String((error as Error).message).slice(0, 300) });
@@ -133,5 +134,5 @@ export function registerAdminAuth(app: FastifyInstance) {
     return reply.redirect("/", 303);
   });
 
-  app.get("/api/admin/me", adminHandler(async (_req, _reply, admin) => ({ name: admin.name, csrf: admin.csrf, dev: admin.dev })));
+  app.get("/api/admin/me", adminHandler(async (_req, _reply, admin) => ({ name: admin.name, csrf: admin.csrf, dev: admin.dev, owner: !admin.dev && admin.role === "owner" })));
 }

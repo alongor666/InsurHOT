@@ -226,8 +226,11 @@ const lockReceipt = (tx: Db, id: number) => tx<{ status: string; attempts: numbe
 
 /**
  * Step 3 after a failed call, bookkeeping only: settles the money, then records the failure. The
- * attempt always gets its outcome; the receipt only while it still waits on this very attempt, so a
- * failure that arrives late (the receipt went unknown, or a newer attempt is under way) cannot reopen it.
+ * receipt takes it only while it still waits on this very attempt, so a failure that arrives late (the
+ * receipt went unknown, or a newer attempt is under way) cannot reopen it. The attempt takes it unless
+ * it was closed meanwhile: an attempt already released as failed keeps that record (the note of an
+ * automatic release is what stops a second one), and is not turned back into "unknown", which a later
+ * release by hand would read as the call the admin checked.
  */
 export async function failPaidAttempt(claim: CallClaim, error: unknown, latencyMs: number): Promise<void> {
   const status = error instanceof ProviderRejectedError ? "failed" : "unknown";
@@ -240,7 +243,10 @@ export async function failPaidAttempt(claim: CallClaim, error: unknown, latencyM
       await tx`UPDATE receipts SET status = ${status}, error = ${message}, updated_at = now() WHERE id = ${claim.id}`;
     }
     await tx`
-      UPDATE receipt_attempts SET status = ${status}, error = ${message}, latency_ms = ${latencyMs}, finished_at = now(),
+      UPDATE receipt_attempts SET
+        status = CASE WHEN status IN ('failed', 'received') THEN status ELSE ${status} END,
+        error = CASE WHEN status IN ('failed', 'received') THEN error ELSE ${message} END,
+        latency_ms = ${latencyMs}, finished_at = now(),
         cost = ${settled.figure}, currency = ${settled.figure === null ? null : claim.price.currency}, cost_basis = ${settled.figure === null ? null : "actual"}
       WHERE id = ${claim.attemptId}`;
   });
@@ -248,9 +254,11 @@ export async function failPaidAttempt(claim: CallClaim, error: unknown, latencyM
 
 /**
  * Step 3 after an answer, bookkeeping only: settles the money, then stores the raw response. The cost
- * written is the figure the ledger took, not one it refused. The receipt takes the answer while it
- * still waits on this attempt, also when it had gone unknown meanwhile; once a newer attempt is under
- * way only the attempt row records it.
+ * written is the figure the ledger took, not one it refused. The receipt takes the answer while this
+ * attempt is still its latest: waiting, gone unknown meanwhile, or already released as failed without
+ * a retry so far (the answer was paid for, and taking it saves paying again). An attempt gets one
+ * outcome, so a failed receipt whose latest attempt this is can only have been released, never
+ * answered. Once a newer attempt is under way only the attempt row records the answer.
  */
 export async function settlePaidAttempt(req: ReceiptRequest, claim: CallClaim, outcome: CallOutcome, latencyMs: number): Promise<{ overrun: boolean; priceSuspended: boolean }> {
   const { settlement, basis } = settlementForOutcome(req.money, claim.price, outcome);
@@ -258,7 +266,7 @@ export async function settlePaidAttempt(req: ReceiptRequest, claim: CallClaim, o
     const [receipt] = await lockReceipt(tx, claim.id);
     const settled = await settleMoney(tx, claim.attemptId, settlement);
     const cost = settled.figure === null ? null : { amount: settled.figure, currency: claim.price.currency, basis };
-    if (receipt && (receipt.status === "pending" || receipt.status === "unknown") && receipt.attempts === claim.attempt) await tx`
+    if (receipt && (receipt.status === "pending" || receipt.status === "unknown" || receipt.status === "failed") && receipt.attempts === claim.attempt) await tx`
       UPDATE receipts SET
         status = 'received',
         response = ${tx.json((outcome.response ?? null) as never)},
@@ -319,9 +327,10 @@ async function startAttempt(tx: Db, receiptId: number, attempt: number, req: Rec
   return row!.id;
 }
 
-// Marking an outcome unknown changes no money: the attempt keeps holding its reservation.
+// Marking an outcome unknown changes no money: the attempt keeps holding its reservation. Only a
+// receipt still waiting becomes unknown; the caller holds its row lock.
 async function markUnknown(tx: Db, receiptId: number, reason: string) {
-  await tx`UPDATE receipts SET status = 'unknown', error = ${reason}, updated_at = now() WHERE id = ${receiptId}`;
+  await tx`UPDATE receipts SET status = 'unknown', error = ${reason}, updated_at = now() WHERE id = ${receiptId} AND status = 'pending'`;
   await tx`UPDATE receipt_attempts SET status = 'unknown', error = ${reason}, finished_at = now() WHERE receipt_id = ${receiptId} AND status = 'pending'`;
 }
 
@@ -330,9 +339,20 @@ async function markUnknown(tx: Db, receiptId: number, reason: string) {
  * they are released like any other unknown outcome even when nothing retries them.
  */
 export async function markStalePendingReceipts(): Promise<number> {
-  const stale = await sql<{ id: number }[]>`SELECT id FROM receipts WHERE status = 'pending' AND updated_at < ${new Date(Date.now() - PENDING_STALE_MS)}`;
-  for (const r of stale) await sql.begin((tx) => markUnknown(tx, r.id, "placeholder went stale without a recorded result"));
-  return stale.length;
+  const cutoff = new Date(Date.now() - PENDING_STALE_MS);
+  const stale = await sql<{ id: number }[]>`SELECT id FROM receipts WHERE status = 'pending' AND updated_at < ${cutoff}`;
+  let marked = 0;
+  for (const r of stale) {
+    marked += (await sql.begin(async (tx) => {
+      // Looked at again under the row lock: an answer or a failure recorded since the list was read,
+      // or a retry that made the placeholder fresh, stays as it is.
+      const [still] = await tx`SELECT 1 FROM receipts WHERE id = ${r.id} AND status = 'pending' AND updated_at < ${cutoff} FOR UPDATE`;
+      if (!still) return 0;
+      await markUnknown(tx, r.id, "placeholder went stale without a recorded result");
+      return 1;
+    })) as number;
+  }
+  return marked;
 }
 
 export async function completeReceipt(db: Db, receiptId: number): Promise<void> {
