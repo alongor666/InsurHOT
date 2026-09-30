@@ -19,7 +19,7 @@ process.env.INDEXNOW_SUBMIT_ENABLED = "false";
 // rule the request layer enforces (by name before DNS, and again on the dialled address), because the
 // tests also set ALLOW_PRIVATE_NETWORK_FETCH, which would otherwise switch the SSRF guard off entirely
 // (tests/outbound-loopback.test.ts proves public names are refused). Paid providers (LLM, embeddings,
-// SocialData, Jina, Dajiala) stay behind the unconditional paid lock until M0.3b; the test files that
+// Jina, Dajiala) stay behind the unconditional paid lock until M0.3b; the test files that
 // need them are listed in tests/paid-lock-blocked.txt.
 process.env.OUTBOUND_LOOPBACK_ONLY = "true";
 process.env.COLLECT_ENABLED = "true";

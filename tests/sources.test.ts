@@ -140,7 +140,6 @@ test("config entries a source kind does not implement are named, not ignored", (
     ["adapter=site_cards", "detail.titleFoo", "contentPublic"],
   );
   assert.deepEqual(unsupportedConfig("rss", { feedUrl: "https://example.org/feed", denyUrlPrefixes: ["https://example.org/business/"] }), []);
-  assert.deepEqual(unsupportedConfig("x_search", { query: "from:a", allowUrlPrefixes: ["https://example.org/"] }), ["allowUrlPrefixes"], "X shards apply no URL rules");
 });
 
 test("a listing that links other articles in its teasers takes only the links that begin a line", () => {

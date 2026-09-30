@@ -1,8 +1,7 @@
-# Individual cases inside otherwise passing files that need a paid provider (LLM, SocialData, Dajiala, Jina).
+# Individual cases inside otherwise passing files that need a paid provider (LLM, Dajiala, Jina).
 # scripts/test-unlocked.sh passes them to node --test-skip-pattern, which filters them out of the run
 # entirely (they are not reported as skipped); the rest of each file still runs.
 # Refs #10, #11.
-an X search longer than one run is read to the old watermark over the next runs
 a WeChat body that failed for a passing reason is fetched on the next check and analysed again
 a Jina listing is read on every fetch, and buys a detail rendering only where a regex rule needs it
 # tests/analyze.test.ts (6 of 8; the two prompt/guard cases stay)
@@ -10,13 +9,9 @@ a selected item: prefilter, two scores, the content understanding and the struct
 a near-selected item is written like a selected one; below the floor it is translated
 the prefilter's BLOCK stops everything; UNKNOWN goes on like PASS
 a feed summary alone: the article page is fetched first, then the whole article is judged
-a short post in Chinese is its own copy; a content-filter refusal is translated instead
+a content-filter refusal is translated instead
 analysing the same revision again reuses every paid answer
 # tests/receipts.test.ts (3 of 5; the valve-off and budget-row cases stay as paid-lock evidence)
 an answer already received is reused instead of bought again
 retries of unusable answers stop at the budget, and every request sent is counted
 an unknown outcome is released automatically once, so a lost answer costs at most one repeat
-# tests/x-shards.test.ts (3 of 6)
-one search reads a shard; each account gets its own posts, run and watermark
-a page failing after the first keeps what was read and goes on from there next run
-a quiet account's old newest post does not drag the shard's search back: its last check does

@@ -1,7 +1,7 @@
-// ADR-002 step 2: the model leaderboard and the Codex reset monitor are removed. Nothing public names
-// them any more, no job belongs to them, their tables are gone, and the push tables that shared their
-// migration are still there.
-import "./setup.ts";
+// ADR-002 step 2: the model leaderboard, the Codex reset monitor, X collection and the translation of
+// quoted posts are removed. Nothing public names them any more, no job belongs to them, their tables
+// and columns are gone, and the push tables that shared a migration with them are still there.
+import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { FastifyInstance } from "fastify";
@@ -64,4 +64,26 @@ test("their tables are dropped; the push tables created beside them stay", async
   const tables = (await sql<{ name: string }[]>`SELECT table_name AS name FROM information_schema.tables WHERE table_schema = current_schema()`).map((t) => t.name);
   assert.deepEqual(tables.filter((t) => /^(lb_|monitor_)/.test(t) || t === "fx_rates"), []);
   for (const kept of ["notify_targets", "deliveries", "delivery_leases"]) assert.ok(tables.includes(kept), kept);
+});
+
+test("X collection is gone from the schema: no source kind, no post columns, no quote table, no SocialData budget", async () => {
+  const columns = (await sql<{ name: string }[]>`SELECT column_name AS name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'articles'`).map((c) => c.name);
+  assert.ok(columns.includes("body_text"), "the articles table was read");
+  assert.deepEqual(columns.filter((c) => c === "x_post" || c === "x_article"), []);
+  assert.deepEqual([...(await sql`SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'quote_translations'`)], []);
+  assert.deepEqual([...(await sql`SELECT 1 FROM budgets WHERE service = 'socialdata'`)], []);
+  const id = `test-removed-x-${tag()}`;
+  await assert.rejects(sql`INSERT INTO sources (id, name, kind) VALUES (${id}, 'an X account', 'x_search')`, /sources_kind_check/);
+  await sql`INSERT INTO sources (id, name, kind, enabled) VALUES (${id}, 'a feed', 'rss', false)`;
+  await sql`DELETE FROM sources WHERE id = ${id}`;
+  const [channel] = await sql<{ def: string }[]>`SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = 'publications_channel_check'`;
+  assert.ok(channel!.def.includes("'news'") && !channel!.def.includes("'x'"), channel!.def);
+});
+
+test("the site no longer filters by the X channel, and the admin cannot create an X source", async () => {
+  assert.equal((await get("/api/site/timeline?channel=x")).statusCode, 400);
+  assert.equal((await get("/api/site/timeline?channel=news")).statusCode, 200);
+  assert.equal((await get("/api/site/timeline?channel=firstParty")).statusCode, 200);
+  const { createSource } = await import("@aihot/backend/admin/sources");
+  await assert.rejects(createSource({ id: `test-removed-x-${tag()}`, name: "an X account", kind: "x_search", config: { query: "from:someone" } } as never, "test"));
 });

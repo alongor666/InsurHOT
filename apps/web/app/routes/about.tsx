@@ -18,7 +18,7 @@ export function headers() {
 interface ContactSettings {
   wechatQr: string | null;
   feishuQr: string | null;
-  /** The maker's X avatar through the image proxy, when the site follows that account. */
+  /** The maker's avatar (the icon of a source the site follows) through the image proxy. */
   makerAvatar?: string | null;
 }
 
@@ -55,7 +55,6 @@ function Figure({ n, unit }: { n: number; unit: string }) {
 }
 
 const KIND_ORDER: Array<[string, string]> = [
-  ["x_search", "X"],
   ["rss", "RSS"],
   ["web_list", "网页"],
   ["mp_account", "公众号"],

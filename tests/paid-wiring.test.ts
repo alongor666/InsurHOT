@@ -1,7 +1,7 @@
 // How paid requests use the monetary limits (ADR-015 step 2), on real PostgreSQL. paidRequest itself
 // stays behind the paid lock, so its three bookkeeping steps are exercised directly: the claim that
 // reserves, and the two settlements. None of them sends anything; the providers' own pricing
-// (chatMoney, embeddingsMoney, jinaMoney, socialdataMoney, dajialaMoney) is checked through them.
+// (chatMoney, embeddingsMoney, jinaMoney, dajialaMoney) is checked through them.
 import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
@@ -15,14 +15,13 @@ import {
   BudgetExceededError, claimPaidRequest, failPaidAttempt, markStalePendingReceipts, ProviderRejectedError, rejectReceivedResponse, settlementForError, settlePaidAttempt,
   type CallOutcome, type MoneySpec, type PaidClaim, type ReceiptRequest,
 } from "@aihot/backend/providers/receipts";
-import { socialdataMoney } from "@aihot/backend/providers/socialdata";
 
 const RUN = tag();
 const LLM = `w-${RUN}-llm`;
 const HOST = `api-${RUN}.wiring.test`;
 const URL_ = `https://${HOST}/v1`;
 const MONTH = budgetMonth(new Date());
-const COLLECTORS = ["dajiala", "jina", "socialdata"];
+const COLLECTORS = ["dajiala", "jina"];
 interface SavedBudget { service: string; per_minute: number; per_hour: number; per_day: number }
 let savedBudgets: SavedBudget[] = [];
 
@@ -40,7 +39,7 @@ before(async () => {
   await sql`UPDATE receipt_attempts SET holds_reservation = false WHERE holds_reservation AND budget_month = ${MONTH}`;
   await sql`DELETE FROM money_usage WHERE month = ${MONTH}`;
   await limit("global", "", 100000);
-  for (const capability of ["score", "translate", "embedding", "collect.dajiala", "collect.jina", "collect.socialdata"]) await limit("capability", capability, 100000);
+  for (const capability of ["score", "translate", "embedding", "collect.dajiala", "collect.jina"]) await limit("capability", capability, 100000);
   await limit("subject", "article", 100000);
   await sql`INSERT INTO budgets (service, per_minute, per_hour, per_day, note) VALUES (${LLM}, 100000, 100000, 100000, 'wiring test') ON CONFLICT (service) DO NOTHING`;
   // The collectors' own count budgets (migration 0022) are raised for the run and restored after.
@@ -257,17 +256,12 @@ test("Dajiala: a per-request row for each endpoint; the provider's own figure co
   await consistent();
 });
 
-test("Jina and SocialData: refused without a cap the provider enforces; with one, reserved at the cap and settled by what came back", async () => {
+test("Jina: refused without a cap the provider enforces; with one, reserved at the cap and settled by what came back", async () => {
   const jina = (): ReceiptRequest => ({ service: "jina", model: null, purpose: "body_fallback", subject: `article:${RUN}j`, identity: { j: n++, run: RUN }, money: jinaMoney(URL_) });
-  const search = (): ReceiptRequest => ({ service: "socialdata", purpose: "source_fetch", subject: `source:${RUN}`, identity: { s: n++, run: RUN }, money: socialdataMoney("search", URL_) });
   await priceRow("jina", "reader", { per_unit: 0.00000036 });
-  await priceRow("socialdata", "search", { per_unit: 0.0014 });
   await assert.rejects(claimPaidRequest(jina()), refused("unbounded_units"));
-  await assert.rejects(claimPaidRequest(search()), refused("unbounded_units"));
-  await assert.rejects(claimPaidRequest({ ...search(), money: socialdataMoney("tweet", URL_) }), refused("missing_price"), "each endpoint has its own row");
 
   await priceRow("jina", "reader", { per_unit: 0.00000036, max_units_per_request: 200000 });
-  await priceRow("socialdata", "search", { per_unit: 0.0014, max_units_per_request: 20 });
   const page = jina();
   const read = called(await claimPaidRequest(page));
   assert.equal((await attemptRow(read.attemptId)).reserved_amount, 0.072);
@@ -279,13 +273,13 @@ test("Jina and SocialData: refused without a cap the provider enforces; with one
   await settlePaidAttempt(silent, quiet, { response: {}, usage: { bytes: 5000, tokens: null } }, 3);
   assert.deepEqual([(await attemptRow(quiet.attemptId)).settled_amount, (await attemptRow(quiet.attemptId)).holds_reservation], [null, true]);
 
-  // More objects than the cap said one request could return: counted in full, and the row is suspended.
-  const query = search();
-  const found = called(await claimPaidRequest(query));
-  assert.equal((await attemptRow(found.attemptId)).reserved_amount, 0.028);
-  assert.deepEqual(await settlePaidAttempt(query, found, { response: {}, usage: { tweets: 50, objects: 50 } }, 3), { overrun: true, priceSuspended: true });
-  assert.equal((await attemptRow(found.attemptId)).settled_amount, 0.07);
-  await assert.rejects(claimPaidRequest(search()), refused("suspended_price"));
+  // More tokens than the cap said one request could return: counted in full, and the row is suspended.
+  const long = jina();
+  const found = called(await claimPaidRequest(long));
+  assert.equal((await attemptRow(found.attemptId)).reserved_amount, 0.072);
+  assert.deepEqual(await settlePaidAttempt(long, found, { response: {}, usage: { bytes: 2_000_000, tokens: 500000 } }, 3), { overrun: true, priceSuspended: true });
+  assert.equal((await attemptRow(found.attemptId)).settled_amount, 0.18);
+  await assert.rejects(claimPaidRequest(jina()), refused("suspended_price"));
   await consistent();
 });
 
