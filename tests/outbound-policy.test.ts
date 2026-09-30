@@ -73,3 +73,30 @@ test("receipt count-budget check rejects missing row before querying counts", as
   await assert.rejects(checkBudget(tx, "unconfigured"), (error: unknown) => error instanceof BudgetExceededError && /missing budget/.test(error.message));
   assert.equal(queries, 1);
 });
+
+
+test("direct integrations reject redirects even when caller requests follow and opt-in is revoked", async () => {
+  let before = 0, after = 0;
+  const saved = process.env.FEISHU_CONTENT_PUSH_ENABLED;
+  const server = createServer((req, res) => {
+    if (req.url === "/before") {
+      before++;
+      process.env.FEISHU_CONTENT_PUSH_ENABLED = "false";
+      res.writeHead(302, { location: "/after" });
+      res.end();
+    } else { after++; res.end("unexpected redirected request"); }
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  try {
+    process.env.FEISHU_CONTENT_PUSH_ENABLED = "true";
+    await assert.rejects(outboundFetch("feishuContent", `http://127.0.0.1:${address.port}/before`, { redirect: "follow" }));
+    assert.equal(before, 1);
+    assert.equal(after, 0);
+    assert.equal(process.env.FEISHU_CONTENT_PUSH_ENABLED, "false");
+  } finally {
+    if (saved === undefined) delete process.env.FEISHU_CONTENT_PUSH_ENABLED; else process.env.FEISHU_CONTENT_PUSH_ENABLED = saved;
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});

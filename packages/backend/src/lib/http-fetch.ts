@@ -66,9 +66,12 @@ export async function guardedFetch(input: string, opts: GuardedFetchOptions = {}
   // nominal 20 s image request to occupy the API for minutes.
   const signal = AbortSignal.timeout(opts.timeoutMs ?? 20_000);
   const route = opts.route ?? "egress";
-  const check = (target: string) => withinDeadline(
-    assertPublicUrl(target, config.allowPrivateNetworkFetch, proxied(new URL(target), route)), signal,
-  );
+  const check = (target: string) => {
+    assertOutboundEnabled("collect");
+    return withinDeadline(
+      assertPublicUrl(target, config.allowPrivateNetworkFetch, proxied(new URL(target), route)), signal,
+    );
+  };
   let url = await check(input);
   const maxRedirects = opts.maxRedirects ?? 5;
   const maxBytes = opts.maxBytes ?? 8 * 1024 * 1024;

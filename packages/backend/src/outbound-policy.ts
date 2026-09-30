@@ -33,5 +33,6 @@ export function assertPaidOutboundDisabled(): void {
 export async function outboundFetch(purpose: OutboundPurpose, input: string | URL, init?: RequestInit): Promise<Response> {
   assertOutboundEnabled(purpose);
   if (purpose === "model" || purpose === "embeddings") assertPaidOutboundDisabled();
-  return fetch(input, init);
+  // Fixed integration endpoints do not need redirects; forbid automatic follow and caller overrides.
+  return fetch(input, { ...init, redirect: "error" });
 }

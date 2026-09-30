@@ -4,7 +4,7 @@
 
 ## 控制合同与外呼盘点
 
-`outbound-policy.ts` 集中定义开关，只有字面值 `true` 是 opt-in；缺省、空、false、1、大小写变体及非法值都拒绝。实际 HTTP 边界每次读取环境，包括已排队、手工、预览、重试及重定向下一跳，不依赖调度器关闭。凭证或数据库 target.enabled 不构成开关授权。
+`outbound-policy.ts` 集中定义开关，只有字面值 `true` 是 opt-in；缺省、空、false、1、大小写变体及非法值都拒绝。实际 HTTP 边界每次读取环境，包括已排队、手工、预览和重试，不依赖调度器关闭。guardedFetch 手工重定向每跳复查；direct integrations 拒绝所有重定向（即使调用方传 redirect:follow），避免原生 fetch 自动跟随绕过开关复查。凭证或数据库 target.enabled 不构成开关授权。
 
 | 路径 / 入口 | 实际边界及控制 |
 |---|---|
@@ -17,7 +17,7 @@
 | notify/feishu postWebhook（含 deliver 队列、内容及 monitor reset 卡片） | 实际 webhook 请求检查 `FEISHU_CONTENT_PUSH_ENABLED=true`，直接调用同受门控 |
 | admin/auth 飞书 OAuth token、userinfo | 每个实际请求检查新开关 `FEISHU_AUTH_ENABLED=true`；配置登录凭证本身不允许 HTTP |
 | operations/indexnow | 实际提交检查 `INDEXNOW_SUBMIT_ENABLED=true`；已有配置/密钥条件仍保留 |
-| media/prepare OG 请求（API_BASE_URL 可配置） | 实际请求检查新开关 `MEDIA_FETCH_ENABLED=true`，默认连本地 warm 请求也不发送 |
+| media/prepare OG 请求（LOCAL_ROUTER_URL 可配置） | 实际请求检查新开关 `MEDIA_FETCH_ENABLED=true`，默认连本地 warm 请求也不发送 |
 | operations/backup S3/COS PUT | 对象存储可能付费，实际 PUT 前始终付费闭锁；没有环境旁路。原有本地 pg_dump/pg_restore/tar 仍可能在手工/已配置调度时执行，未执行本轮 |
 
 付费闭锁也拒绝已有 received/completed receipt 的 paidRequest 调用，本次选择更保守地在 DB 前阻断整个入口。旧回执读取/管理功能未删除。缺预算行在实际 `checkBudget` 中抛 `BudgetExceededError`，不再无限制；现有请求次数预算不等于金额预算，不能授权付费。
@@ -48,7 +48,7 @@ env -u DATABASE_URL -u OPENAI_API_KEY -u ANTHROPIC_API_KEY \
 
 | 验证 | 结果 | 退出码 |
 |---|---|---|
-| 3项 Node 定向测试 | 本地假 HTTP：缺省/false/非法值零请求，true 可用免费集成，再次关闭阻断；paidRequest 所有开关状态零 DB/零 callback；缺预算 fake Db 只读预算一次即拒绝 | 0 |
+| 4项 Node 定向测试 | 本地假 HTTP：缺省/false/非法值零请求，true 可用免费集成，再次关闭阻断；paidRequest 所有开关状态零 DB/零 callback；缺预算 fake Db 只读预算一次即拒绝；direct integration 在本地302回执中撤销开关，初始请求1次、重定向目的地0次（调用方指定follow仍拒绝） | 0 |
 | typecheck | 所有 tsc 项目、web typegen 完成 | 0 |
 | web build | 客户端/SSR 包完成 | 0 |
 
@@ -61,3 +61,7 @@ NOT RUN：PG迁移/seed/backend全套、web应用测试、Docker smoke、完整�
 原始489清单和映射保持不变。M0.2原样 verifier 只证明固定 M0.2 快照；本轮修改后**未执行/未声称该原样 verifier 通过**。受控差异见 [M0.3a blob 台账](m0-3a-upstream-delta.md)，对所有489映射逐项比对得到15项有意修改，其余474项 blob/mode 保持原样；LICENSE/NOTICE/第三方许可不变。新 policy/test 与治理文档不属于原始489。
 
 后续评审绑定最终提交；作者自检不代替独立评审。回滚使用本 PR 相对固定 base 的提交逆序 revert；不合并 PR #6/#7，不改变 M0.4/M0.5 范围。
+
+## 独立评审修复 M03A-R01
+
+独立评审发现 direct outboundFetch 原生自动重定向不复查 opt-in（P1）。修复为原生 fetch 强制 redirect:error，调用方参数不能覆盖；本地302/撤销开关回归已补充。guardedFetch 保持既有手工重定向及每跳复查。同时在guardedFetch每跳URL校验/DNS前复查采集门，保留HTTP前复查。修复后定向测试/typecheck重跑通过；web build未重跑（后端wrapper和Node测试变更，先前静态构建结果仅对应修复前代码，最终HEAD独立复核仍必需）。

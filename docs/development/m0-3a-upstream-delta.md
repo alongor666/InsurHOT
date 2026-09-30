@@ -10,7 +10,7 @@
 | `packages/backend/src/admin/auth.ts` | `e7f8e420b0f2909b03174e87c7004fb60f1b8dd0` | `db85d7605764df698956e9ab382de5e912456049` |
 | `packages/backend/src/config.ts` | `07c89ec76e6682cfe9d3bef847821cdf35d91c22` | `52a55f43c9be1c39a331b96145d2820e70bbb858` |
 | `packages/backend/src/leaderboard/fetch/sources/artificial-analysis.ts` | `7979ac11bf9368406b02bf94264393c8536a22de` | `fa556864fbda9e35d086ac4171208a984ebe31d0` |
-| `packages/backend/src/lib/http-fetch.ts` | `58a9ed8e8ea066b7c96f3959f174e54915724669` | `0fa73ed1a74664764eb732e35883f54f10cac693` |
+| `packages/backend/src/lib/http-fetch.ts` | `58a9ed8e8ea066b7c96f3959f174e54915724669` | `291c5d5b568da8ad1a4f9c0c64889bfcc01c4fe2` |
 | `packages/backend/src/media/prepare.ts` | `a7d017d89c70b6317e664a2d5d7de718bc8b770b` | `fa77338c7f3fc8726b051631d00b8e513f17e4bb` |
 | `packages/backend/src/notify/feishu.ts` | `898639b8535171f43f0eef703d6c59d01ac4ccea` | `2c263e087ba63d5a2c42c0f39168336f12baf5a6` |
 | `packages/backend/src/operations/alerts.ts` | `9e6bcb0fea4aff090192a91214fb2961154238f7` | `6a0831dbe588312830d643d8bc211675e8460c5a` |
@@ -20,4 +20,4 @@
 | `packages/backend/src/providers/llm.ts` | `748569c8eae0b504a86ddd6b4b63d4315034e643` | `e7283eb699ff218b7148152d738400ae15f34c1f` |
 | `packages/backend/src/providers/receipts.ts` | `64048742788f105f65ae6ffe5b64f63c08054558` | `64fb34b67d7702f2b693342baf0f55498c5f4049` |
 
-新增 `packages/backend/src/outbound-policy.ts`、`tests/outbound-policy.test.ts` 与本轮治理文档不属于原始489。LICENSE、NOTICE、第三方许可及manifest未改。代码固定本地提交 `147fa9c`；本PR完整受控差异用 `git diff b9183a226e97e0f332d12c82ce96b8f11b2bc2c0..HEAD --stat` 查看；最终评审SHA在PR/协调器记录。
+新增 `packages/backend/src/outbound-policy.ts`、`tests/outbound-policy.test.ts` 与本轮治理文档不属于原始489。LICENSE、NOTICE、第三方许可及manifest未改。初次代码固定本地提交 `147fa9c`；M03A-R01后续修复见PR最终HEAD；本PR完整受控差异用 `git diff b9183a226e97e0f332d12c82ce96b8f11b2bc2c0..HEAD --stat` 查看；最终评审SHA在PR/协调器记录。
