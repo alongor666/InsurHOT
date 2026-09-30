@@ -62,9 +62,13 @@ jobs:
         # Before the backend tests, which write their own rows: this reads the freshly seeded database.
         run: |
           node apps/api/src/main.ts > "$RUNNER_TEMP/api.log" 2>&1 &
+          api=$!
           (cd apps/web && NODE_ENV=production exec node server.ts) > "$RUNNER_TEMP/web.log" 2>&1 &
+          web=$!
           for i in $(seq 1 60); do curl -fsS -o /dev/null http://127.0.0.1:3000/api/health 2>/dev/null && break; sleep 1; done
           node scripts/smoke.ts --base http://127.0.0.1:3000
+          # The backend tests that follow get the database and the ports to themselves.
+          kill "$api" "$web"
       - name: Backend tests (paid-lock-blocked files and cases excluded, see tests/paid-lock-blocked*.txt)
         run: bash scripts/test-unlocked.sh
       - name: Server logs
@@ -101,11 +105,28 @@ jobs:
           for i in $(seq 1 90); do curl -fsS -o /dev/null http://127.0.0.1:3000/api/health 2>/dev/null && break; sleep 2; done
           docker compose ps
           docker compose run --rm --no-deps --entrypoint node setup scripts/smoke.ts --base http://web:3000
-          # Every role is up, the worker included (the smoke check only reaches web and api).
-          test "$(docker compose ps --status running --services | sort | tr '\n' ' ')" = "api db web worker "
+          # Every role is still up a while after starting, the worker included (the smoke check only reaches
+          # web and api), and none has been restarted: a role that crashes is restarted by compose and would
+          # otherwise look "running". Each compared value is printed so the log shows what was checked.
+          sleep 20
+          docker compose ps
+          running="$(docker compose ps --status running --services | sort | tr '\n' ' ')"
+          echo "running services: $running"
+          test "$running" = "api db web worker "
+          for s in api web worker; do
+            state="$(docker inspect -f '{{.State.Status}} restarts={{.RestartCount}}' "$(docker compose ps -q "$s")")"
+            echo "$s: $state"
+            test "$state" = "running restarts=0"
+          done
           # The setup service migrated and seeded: every migration is recorded and the demo sources are there.
-          test "$(docker compose exec -T db psql -U aihot -d aihot -Atc 'select count(*) from schema_migrations')" = "$(ls database/migrations/*.sql | wc -l | tr -d ' ')"
-          test "$(docker compose exec -T db psql -U aihot -d aihot -Atc 'select count(*) from sources')" = "$(node -e 'console.log(JSON.parse(require("fs").readFileSync("industry/sources.json","utf8")).sources.length)')"
+          recorded="$(docker compose exec -T db psql -U aihot -d aihot -Atc 'select count(*) from schema_migrations')"
+          files="$(ls database/migrations/*.sql | wc -l | tr -d ' ')"
+          echo "migrations recorded: $recorded, migration files: $files"
+          test "$recorded" = "$files"
+          seeded="$(docker compose exec -T db psql -U aihot -d aihot -Atc 'select count(*) from sources')"
+          listed="$(node -e 'console.log(JSON.parse(require("fs").readFileSync("industry/sources.json","utf8")).sources.length)')"
+          echo "sources in the database: $seeded, in industry/sources.json: $listed"
+          test "$seeded" = "$listed"
       - name: Logs
         if: failure()
         run: docker compose logs --tail 80
