@@ -366,8 +366,9 @@ test("settling and reserving in one transaction, in either order, does not deadl
   const held = await Promise.all(Array.from({ length: 12 }, () => reserve(0.5)));
   const fresh = await Promise.all(Array.from({ length: 12 }, () => attempt()));
   const work = held.flatMap((id, n) => [
-    // A retry path: settle the old attempt, then reserve the new one.
-    sql.begin(async (tx) => { await settleMoney(tx, id, { kind: "hold" }); await reserveMoney(tx, fresh[n]!, res(0.5)); }),
+    // A retry path: settle the old attempt, then reserve the new one. The settlement must change the
+    // ledger (a figure below the reservation), or it takes no ledger row and proves nothing about lock order.
+    sql.begin(async (tx) => { await settleMoney(tx, id, { kind: "actual", amount: 0.3, currency: "CNY" }); await reserveMoney(tx, fresh[n]!, res(0.5)); }),
     reserve(0.5),
     (async () => {
       const other = await reserve(0.5);
@@ -442,6 +443,12 @@ test("an actual cost above the reservation is counted in full and suspends the p
   await assert.rejects(approvedPrice(sql, priced, "m1", "https://api.example.test"), refused("suspended_price"));
   const reason = async () => (await sql<{ suspended_reason: string }[]>`SELECT suspended_reason FROM service_prices WHERE service = ${priced} AND model = 'm1'`)[0]!.suspended_reason;
   assert.match(await reason(), /cost 0\.35 CNY, reserved 0\.1/);
+  // Once a figure has proved the reservation too small, a later "no figure" finding does not fall back below it.
+  const proved = await onRow(0.1);
+  await settle(proved, { kind: "actual", amount: 0.3, currency: "CNY" });
+  assert.deepEqual(await settle(proved, { kind: "hold" }), { counted: 0.3, overrun: false, priceSuspended: false });
+  assert.equal(await used("global", ""), 0.65);
+  await settle(proved, { kind: "release" });
   // A second overrun on the suspended row keeps the first reason.
   assert.deepEqual(await settle(await onRow(0.1), { kind: "actual", amount: 0.2, currency: "CNY" }), { counted: 0.2, overrun: true, priceSuspended: true });
   assert.match(await reason(), /cost 0\.35/);

@@ -8,7 +8,11 @@
 // 4. Usage lives in ledger rows changed by relative increments in the same transaction as the attempt.
 //
 // Lock order, the same for reserving and settling: the global money lock, then the attempt row, then
-// the ledger rows in one fixed order. A caller holding a per-service lock takes it before these.
+// the ledger rows in one fixed order. Two rules follow for every transaction that calls in here:
+//   - a per-service budget lock (receipts.ts) is taken before the first call, never after one;
+//   - an existing receipt_attempts row is written only after the money calls, or after lockMoney(tx)
+//     has been taken first. A transaction that updates an attempt and then settles it waits for the
+//     global lock while holding the row, and deadlocks with one that holds the lock and wants the row.
 //
 // Nothing here opens the paid lock (outbound-policy.ts): with empty tables everything is refused.
 import { sql, type Db } from "../db.ts";
@@ -300,7 +304,8 @@ async function addToLedger(tx: Db, rows: LedgerRow[], currency: Currency, month:
   }
 }
 
-const moneyLock = (tx: Db) => tx`SELECT pg_advisory_xact_lock(hashtext('budget:money'))`;
+/** The global money lock. reserveMoney and settleMoney take it themselves; take it first in a transaction that must write an attempt row before calling them. */
+export const lockMoney = (tx: Db) => tx`SELECT pg_advisory_xact_lock(hashtext('budget:money'))`;
 
 /**
  * Reserves the worst case of an attempt about to be sent, or refuses. Runs inside the caller's
@@ -313,7 +318,7 @@ export async function reserveMoney(tx: Db, attemptId: number, reservation: Reser
   const amount = ceilMicro(reservation.amount);
   const subjectKeys = subjectKeysFor(capability, reservation.subject);
   const currency = price.currency;
-  await moneyLock(tx);
+  await lockMoney(tx);
   const [attempt] = await tx<{ started_at: Date; holds_reservation: boolean; reserved_amount: number | null }[]>`
     SELECT started_at, holds_reservation, reserved_amount FROM receipt_attempts WHERE id = ${attemptId} FOR UPDATE`;
   if (!attempt) throw new Error(`Attempt ${attemptId} does not exist`);
@@ -362,7 +367,7 @@ export interface SettlementResult {
  * finding changes the outcome (an unknown receipt checked by hand).
  */
 export async function settleMoney(tx: Db, attemptId: number, settlement: Settlement): Promise<SettlementResult> {
-  await moneyLock(tx);
+  await lockMoney(tx);
   const [a] = await tx<{
     capability: string | null; price_service: string | null; price_key: string | null; subject_keys: string[]; budget_month: string | null;
     reserved_amount: number | null; reserved_currency: Currency | null; settled_amount: number | null; holds_reservation: boolean;
@@ -381,12 +386,15 @@ export async function settleMoney(tx: Db, attemptId: number, settlement: Settlem
     return { counted: 0, overrun: false, priceSuspended: false };
   }
   // A figure in another currency cannot be counted against this currency's limits: the reservation stays.
-  const actual = settlement.kind === "actual" && settlement.currency === a.reserved_currency && Number.isFinite(settlement.amount) && settlement.amount >= 0
+  const figure = settlement.kind === "actual" && settlement.currency === a.reserved_currency && Number.isFinite(settlement.amount) && settlement.amount >= 0
     ? ceilMicro(settlement.amount) : null;
+  // Without a figure the reservation counts, but never less than an earlier figure that already proved it too small.
+  const proven = a.holds_reservation && a.settled_amount !== null && a.settled_amount > a.reserved_amount ? a.settled_amount : null;
+  const actual = figure ?? proven;
   const counted = actual ?? a.reserved_amount;
   await tx`UPDATE receipt_attempts SET holds_reservation = true, settled_amount = ${actual} WHERE id = ${attemptId}`;
   await addToLedger(tx, rows, a.reserved_currency, a.budget_month, counted - before);
-  const overrun = actual !== null && actual > a.reserved_amount;
+  const overrun = figure !== null && figure > a.reserved_amount;
   let priceSuspended = false;
   if (overrun) {
     // The bound was wrong for this price row: nothing more goes out on it until the owner approves it again.

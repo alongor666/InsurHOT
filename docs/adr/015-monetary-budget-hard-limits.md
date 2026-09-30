@@ -121,14 +121,14 @@ Jina 与 SocialData：当前代码没有任何可声明的上限。**在 owner �
 
 占用用**台账行**维护，不对 attempt 逐月求和：新表 `money_usage(scope, key, currency, month, amount)`，在预留、结算、释放的同一事务内增减。增减一律用相对增量（`SET amount = amount + Δ`），不先读后写绝对值；一笔 attempt 涉及的各行（全局、capability、各主体键）按固定顺序更新。结算把 `coalesce(settled_amount, reserved_amount) − reserved_amount` 加到该 attempt 的每一行；释放从每一行减去 `reserved_amount`。行由 attempt 的 `capability`、`subject_key`、`reserved_currency` 与 `started_at` 所在月份确定，跨月结算写回**发起月**的行。另有对账查询（对 attempt 求 `Σ coalesce(settled_amount, reserved_amount) WHERE holds_reservation AND origin = 'live'`，按 `reserved_currency` 与月份分组）在测试与每日运维任务中比对台账，发现漂移即告警。月份按预算时区的自然月，以 attempt 的 `started_at` 归月；跨月的 pending/unknown 归发起月。
 
-放行在现有事务内进行。判断走哪个分支需要先在每服务锁内读取回执（`receipts.ts:116-126`），所以锁序是：**每服务锁 → 判断分支 → 仅在确实要发请求的分支再取单一全局 advisory lock（`budget:money`）**；复用已有回执、busy、unknown 分支不取全局锁。所有路径顺序一致，不会死锁；`publish.ts` 的锁与此路径不相交。取得全局锁后：
+放行在现有事务内进行。判断走哪个分支需要先在每服务锁内读取回执（`receipts.ts:116-126`），所以锁序是：**每服务锁 → 判断分支 → 仅在确实要发请求的分支再取单一全局 advisory lock（`budget:money`）**；复用已有回执、busy、unknown 分支不取全局锁。所有路径顺序一致，不会死锁；`publish.ts` 的锁与此路径不相交。结算同样先取全局锁（评审实测：结算不取全局锁时，"先结算后预留"的事务会与并发预留死锁），因此锁序统一为"（每服务锁 →）全局锁 → attempt 行 → 台账行"，并对调用方有两条约束：每服务锁只能在第一次调用金额函数之前取，取得全局锁后不得再取；同一事务里对已有 attempt 行的写入必须在金额函数之后，或先显式取全局锁。取得全局锁后：
 
 1. 查价格、算上界 `w`。
 2. 读适用各行的台账；任一行 `amount + w > monthly_limit` → 抛 `MonthlyBudgetExhaustedError`（第 8 节）。
 3. 次数预算 `checkBudget` **保留**，照旧检查。
 4. 通过则写 attempt（`reserved_amount = w`、`holds_reservation = true`）并给各行台账加 `w`；提交后才发请求（与现有两段事务结构相容）。
 
-结算在一个事务内更新 attempt 与台账，只看 `holds_reservation`，**不看 status**（`release()` 会把 status 改为 failed）：
+结算在一个事务内（先取全局锁）更新 attempt 与台账，只看 `holds_reservation`，**不看 status**（`release()` 会把 status 改为 failed）：
 
 | 结局 | `holds_reservation` | `settled_amount` |
 |---|---|---|
@@ -155,7 +155,7 @@ Jina 与 SocialData：当前代码没有任何可声明的上限。**在 owner �
 
 第一次出现 `settled_amount > reserved_amount`：按实际值计入，把该价格行置为 suspended（之后该 `(service, model)` 一律拒绝），并发"now"级告警。恢复需要 owner 重新批准价格行。
 
-这只能发现两类错误：**上界算法错误**（实际 token 多于上界）与**供应商自报金额高于预留**（Dajiala）。它**发现不了价格行本身填低**——实际成本用同一价格行计算，单价填低时"实际"也同样偏低。因此 owner 需要按供应商账单做月度对账（待批准项 8）。结算不持全局锁，停用之前已放行的请求照常入账，最坏超额约为"在途并发数 × 单笔误差"。
+这只能发现两类错误：**上界算法错误**（实际 token 多于上界）与**供应商自报金额高于预留**（Dajiala）。它**发现不了价格行本身填低**——实际成本用同一价格行计算，单价填低时"实际"也同样偏低。因此 owner 需要按供应商账单做月度对账（待批准项 8）。停用之前已经放行、尚在途中的请求照常入账，最坏超额约为"在途并发数 × 单笔误差"。已被某个实际金额证明不够的预留，之后即使改判为"无可用数字"也不会回落到该预留额以下。
 
 ### 8. 耗尽后的行为：单独的错误类型，不延后、不空转
 
