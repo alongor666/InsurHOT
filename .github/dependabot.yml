@@ -1,0 +1,15 @@
+# Version updates are off (limit 0) so the pinned lockfile only changes on purpose. Security updates
+# are a repository setting ("Dependabot security updates"), not this file: the owner enables them in
+# Settings → Code security; they then open PRs regardless of the limit below.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0

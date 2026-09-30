@@ -11,6 +11,7 @@ import { config } from "@aihot/backend/config";
 import { closeDb, sql } from "@aihot/backend/db";
 import { forwardFeedbackToFeishu } from "@aihot/backend/notify/feishu";
 import { forwardPendingFeedback, submitFeedback } from "@aihot/backend/operations/feedback";
+import { FETCH_TEST_DOUBLE, assertLoopbackUrl } from "@aihot/backend/outbound-policy";
 
 const T = tag();
 config.dataDir = mkdtempSync(path.join(tmpdir(), "aihot-feedback-"));
@@ -23,7 +24,9 @@ const feishu = { uploadFails: false, sendFails: false, sent: [] as Array<{ title
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
   const url = String(input instanceof Request ? input.url : input);
-  if (!url.startsWith("https://open.feishu.cn/")) return realFetch(input, init);
+  // Anything not answered here goes to the real fetch only when it stays on this host: always asserted
+  // (setup.ts sets OUTBOUND_LOOPBACK_ONLY for every test process), and the original input is passed on.
+  if (!url.startsWith("https://open.feishu.cn/")) { assertLoopbackUrl(url); return realFetch(input, init); }
   if (url.endsWith("/auth/v3/tenant_access_token/internal")) return Response.json({ code: 0, tenant_access_token: "t", expire: 7200 });
   if (url.endsWith("/im/v1/images")) return Response.json(feishu.uploadFails ? { code: 99, msg: "upload broken" } : { code: 0, data: { image_key: `img_${T}` } });
   if (url.includes("/im/v1/messages")) {
@@ -34,6 +37,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   }
   throw new Error(`unexpected request ${url}`);
 }) as typeof fetch;
+Object.assign(globalThis.fetch, { [FETCH_TEST_DOUBLE]: true });
 
 after(async () => {
   globalThis.fetch = realFetch;

@@ -1,10 +1,10 @@
 // Outbound HTTP for collectors, the image proxy and the paid APIs: SSRF guard, routing, limits.
-import { assertOutboundEnabled } from "../outbound-policy.ts";
+import { assertLoopbackUrl, assertOutboundEnabled, loopbackOnly } from "../outbound-policy.ts";
 import net from "node:net";
 import { addAbortListener } from "node:events";
 import { Agent, ProxyAgent, fetch as undiciFetch, type Dispatcher } from "undici";
 import { config } from "../config.ts";
-import { assertPublicUrl, guardedLookup } from "./url.ts";
+import { assertPublicUrl, guardedLookup, loopbackLookup } from "./url.ts";
 import { SITE } from "@aihot/industry/site";
 
 /**
@@ -19,14 +19,20 @@ export type EgressRoute = "egress" | "direct";
 
 let proxyAgent: ProxyAgent | null = null;
 let directAgent: Agent | null = null;
+let loopbackAgent: Agent | null = null;
 
 function proxied(url: URL, route: EgressRoute): boolean {
-  if (route !== "egress" || !config.egressProxyUrl) return false;
+  if (loopbackOnly() || route !== "egress" || !config.egressProxyUrl) return false;
   const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
   return net.isIP(host) === 0 && !host.endsWith(".cn") && !host.endsWith(".local");
 }
 
 function dispatcherFor(viaProxy: boolean): Dispatcher | undefined {
+  if (loopbackOnly()) {
+    // Loopback-only wins over the proxy and over ALLOW_PRIVATE_NETWORK_FETCH: the dialled address is checked.
+    loopbackAgent ??= new Agent({ connect: { lookup: loopbackLookup as never } });
+    return loopbackAgent;
+  }
   if (viaProxy) {
     proxyAgent ??= new ProxyAgent(config.egressProxyUrl!);
     return proxyAgent;
@@ -68,6 +74,7 @@ export async function guardedFetch(input: string, opts: GuardedFetchOptions = {}
   const route = opts.route ?? "egress";
   const check = (target: string) => {
     assertOutboundEnabled("collect");
+    if (loopbackOnly()) assertLoopbackUrl(target);
     return withinDeadline(
       assertPublicUrl(target, config.allowPrivateNetworkFetch, proxied(new URL(target), route)), signal,
     );
