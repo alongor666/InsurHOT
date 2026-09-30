@@ -9,7 +9,7 @@ import { modelFor } from "../editorial/models.ts";
 import { addDays, beijingDate, beijingMidnight, isoWeekLabel, isoWeekRange } from "@aihot/contracts/time";
 import { sql } from "../db.ts";
 import { chatJson } from "../providers/llm.ts";
-import { blockForBudget, isBudgetBlocked, refusedByMoney } from "../jobs/budget-blocked.ts";
+import { blockForBudget, clearBudgetBlock, isBudgetBlocked, refusedByMoney } from "../jobs/budget-blocked.ts";
 import { completeReceipt } from "../providers/receipts.ts";
 import { shutdownSignal } from "../jobs/queue.ts";
 
@@ -134,7 +134,9 @@ export async function unlessBudgetBlocked(kind: "daily" | "weekly" | "monthly", 
   const ref = `${kind}:${key}`;
   if (await isBudgetBlocked("report", ref)) return { key, entries: 0, budgetBlocked: true };
   try {
-    return await compose();
+    const composed = await compose();
+    await clearBudgetBlock("report", ref);
+    return composed;
   } catch (error) {
     if (!refusedByMoney(error)) throw error;
     await blockForBudget("report", ref, error);
@@ -271,12 +273,45 @@ export async function composeMonthly(label: string, reason = "scheduled") {
   return composePeriod("monthly", label, start, addDays(next, -1), reason);
 }
 
+const composeByRef = (kind: "daily" | "weekly" | "monthly", key: string): Promise<Composed> =>
+  kind === "daily" ? composeDaily(key, "resumed") : kind === "weekly" ? composeWeekly(key, "resumed") : composeMonthly(key, "resumed");
+
 /**
- * Catch-up: generates any missing daily report for the last `days` days (never the future and never
- * before the first report in the database), the last complete week and the last complete month.
+ * Reports an admin resumed are composed here, whatever their age: the catch-up below only looks a few
+ * days back, and a month that ran out early leaves older ones. One the limits refuse again is blocked
+ * again; any other failure is left for the next run.
  */
-export async function catchUpReports(now = new Date(), days = 7): Promise<{ generated: string[] }> {
-  const generated: string[] = [];
+export async function composeResumedReports(compose: typeof composeByRef = composeByRef): Promise<{ composed: string[]; failed: string[] }> {
+  const composed: string[] = [];
+  const failed: string[] = [];
+  const rows = await sql<{ ref: string }[]>`SELECT ref FROM budget_blocked WHERE kind = 'report' AND resumed_at IS NOT NULL ORDER BY blocked_at, ref`;
+  for (const { ref } of rows) {
+    if (shutdownSignal.signal.aborted) break;
+    const at = ref.indexOf(":");
+    const kind = ref.slice(0, at), key = ref.slice(at + 1);
+    if ((kind !== "daily" && kind !== "weekly" && kind !== "monthly") || !key) continue;
+    const [exists] = await sql`SELECT 1 FROM reports WHERE kind = ${kind} AND key = ${key}`;
+    if (exists) {
+      await clearBudgetBlock("report", ref);
+      continue;
+    }
+    try {
+      if (!(await compose(kind, key)).budgetBlocked) composed.push(ref);
+    } catch (error) {
+      failed.push(`${ref}: ${String(error instanceof Error ? error.message : error).slice(0, 200)}`);
+    }
+  }
+  return { composed, failed };
+}
+
+/**
+ * Catch-up: first the reports an admin resumed after the monetary limits had stopped them; then any
+ * missing daily report for the last `days` days (never the future and never before the first report
+ * in the database), the last complete week and the last complete month.
+ */
+export async function catchUpReports(now = new Date(), days = 7): Promise<{ generated: string[]; resumeFailed?: string[] }> {
+  const resumed = await composeResumedReports();
+  const generated: string[] = [...resumed.composed];
   const today = beijingDate(now);
   const bjHour = Number(new Date(now.getTime() + 8 * 3600000).toISOString().slice(11, 13));
   const [first] = await sql<{ key: string | null }[]>`SELECT min(key) AS key FROM reports WHERE kind = 'daily'`;
@@ -310,5 +345,5 @@ export async function catchUpReports(now = new Date(), days = 7): Promise<{ gene
       if (!(await composeMonthly(prevMonth, "catch-up")).budgetBlocked) generated.push(`monthly:${prevMonth}`);
     }
   }
-  return { generated };
+  return resumed.failed.length ? { generated, resumeFailed: resumed.failed } : { generated };
 }

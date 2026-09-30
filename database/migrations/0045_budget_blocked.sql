@@ -9,12 +9,15 @@ ALTER TABLE articles ADD CONSTRAINT articles_processing_state_check
 CREATE INDEX articles_budget_blocked_idx ON articles (discovered_at) WHERE processing_state = 'budget_blocked';
 
 -- Other refused work: grouping an article (ref = article id), a story digest (ref = story id),
--- a report (ref = kind:key). `job` is what the queue needs to run it again.
+-- a report (ref = kind:key). `job` is what the queue needs to run it again. A resumed grouping or
+-- digest row is deleted and its job queued; a report has no job, so its row stays with resumed_at
+-- set until the hourly catch-up has composed it (whatever its age), and no longer counts as stopped.
 CREATE TABLE budget_blocked (
   kind        text NOT NULL CHECK (kind IN ('group', 'digest', 'report')),
   ref         text NOT NULL,
   job         jsonb NOT NULL DEFAULT '{}'::jsonb,
   reason      text NOT NULL,
   blocked_at  timestamptz NOT NULL DEFAULT now(),
+  resumed_at  timestamptz,
   PRIMARY KEY (kind, ref)
 );

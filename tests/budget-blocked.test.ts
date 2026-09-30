@@ -22,7 +22,8 @@ import { sha256 } from "@aihot/backend/lib/ids";
 import { collectFindings } from "@aihot/backend/operations/alerts";
 import { MoneyRefusedError, MonthlyBudgetExhaustedError } from "@aihot/backend/providers/money";
 import { BudgetExceededError, ProviderRejectedError, ReceiptBusyError } from "@aihot/backend/providers/receipts";
-import { unlessBudgetBlocked } from "@aihot/backend/reports/compose";
+import { composeResumedReports, unlessBudgetBlocked } from "@aihot/backend/reports/compose";
+import { scheduleMpReconcile } from "@aihot/backend/sources/mp";
 
 const T = tag();
 const SOURCE = `test-blocked-${T}`;
@@ -192,13 +193,80 @@ test("an admin resumes what was stopped, a bounded number per call, newest artic
   assert.deepEqual([await blockRow("group", group), await isBudgetBlocked("report", report)], [undefined, true]);
 
   assert.deepEqual(await resumeBudgetBlocked({ reason: "上限已提高" }, "admin:t"), { resumed: { articles: 0, group: 0, digest: 0, report: 1 }, left: 0 });
-  // With its mark gone the report is composed the next time it is asked for.
-  let composed = 0;
-  await unlessBudgetBlocked("daily", report.slice("daily:".length), async () => { composed += 1; return { key: report, entries: 1 }; });
-  assert.equal(composed, 1);
+  // A resumed report keeps its row, marked, until the hourly catch-up has composed it; it no longer counts as stopped.
+  assert.equal(await isBudgetBlocked("report", report), false);
+  assert.deepEqual((await budgetBlockedOverview()).other.map((o) => [o.kind, o.n, o.resuming]), [["report", 0, 1]]);
+  assert.deepEqual(await resumeBudgetBlocked({ reason: "上限已提高" }, "admin:t"), { resumed: { articles: 0, group: 0, digest: 0, report: 0 }, left: 0 }, "not resumed twice");
   const audits = await sql<{ reason: string; after: { left: number } }[]>`SELECT reason, after FROM audit_log WHERE action = 'budget-blocked.resume' AND actor = 'admin:t' ORDER BY id DESC LIMIT 3`;
-  assert.deepEqual(audits.map((a) => [a.reason, a.after.left]), [["上限已提高", 0], ["上限已提高", 1], ["上限已提高", 4]]);
+  assert.deepEqual(audits.map((a) => [a.reason, a.after.left]), [["上限已提高", 0], ["上限已提高", 0], ["上限已提高", 1]]);
   await sql`DELETE FROM audit_log WHERE action = 'budget-blocked.resume' AND actor = 'admin:t'`;
+});
+
+test("a resumed report is composed by the catch-up whatever its age; refused again it is stopped again; one that exists already just loses its mark", async () => {
+  await sql`DELETE FROM budget_blocked WHERE ref LIKE ${`%${T}%`}`;
+  const old = `daily:2030-01-${T}`, again = `weekly:2030-W01-${T}`, broken = `monthly:2030-01-${T}`, exists = `daily:2030-02-${T}`;
+  for (const ref of [old, again, broken, exists]) await blockForBudget("report", ref, usedUp());
+  await sql`INSERT INTO reports (kind, key, window_start, window_end, content, generated_at) VALUES ('daily', ${exists.slice(6)}, now(), now(), '{}'::jsonb, now())`;
+  try {
+    const asked: string[] = [];
+    const compose = (kind: "daily" | "weekly" | "monthly", key: string) => unlessBudgetBlocked(kind, key, async () => {
+      asked.push(`${kind}:${key}`);
+      if (`${kind}:${key}` === again) throw usedUp();
+      if (`${kind}:${key}` === broken) throw new Error("boom");
+      return { key, entries: 1 };
+    });
+    // Not resumed: nothing is composed.
+    assert.deepEqual(await composeResumedReports(compose), { composed: [], failed: [] });
+    assert.deepEqual(asked, []);
+    assert.equal((await resumeBudgetBlocked({ reason: "上限已提高" }, "admin:t")).resumed.report, 4);
+    const result = await composeResumedReports(compose);
+    assert.deepEqual([result.composed, result.failed.map((f) => f.split(": ")[0]), asked.sort()], [[old], [broken], [old, broken, again].sort()]);
+    const left = await sql<{ ref: string; resumed: boolean }[]>`SELECT ref, resumed_at IS NOT NULL AS resumed FROM budget_blocked WHERE ref LIKE ${`%${T}%`} ORDER BY ref`;
+    // Composed and already-there are gone; refused again is stopped again; the other failure waits, still resumed, for the next run.
+    assert.deepEqual(left.map((r) => [r.ref, r.resumed]), [[broken, true], [again, false]].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
+    assert.equal(await isBudgetBlocked("report", again), true);
+  } finally {
+    await sql`DELETE FROM reports WHERE kind = 'daily' AND key = ${exists.slice(6)}`;
+    await sql`DELETE FROM budget_blocked WHERE ref LIKE ${`%${T}%`}`;
+    await sql`DELETE FROM audit_log WHERE action = 'budget-blocked.resume' AND actor = 'admin:t'`;
+  }
+});
+
+test("two resume calls at once never take the same item", async () => {
+  for (let round = 0; round < 6; round++) {
+    await sql`DELETE FROM budget_blocked WHERE ref LIKE ${`%${T}%`}`;
+    await sql`UPDATE articles SET processing_state = 'analyzed' WHERE source_id = ${SOURCE}`;
+    const ids: string[] = [];
+    for (let i = 0; i < 10; i++) ids.push(await article(`race-${round}-${i}`));
+    for (const id of ids) await afterFailure(id, usedUp());
+    for (let i = 0; i < 6; i++) await groupJobFailed({ articleId: `g-${T}-race-${round}-${i}` }, usedUp());
+    const [a, b] = await Promise.all([resumeBudgetBlocked({ limit: 10, reason: "r" }, "admin:t"), resumeBudgetBlocked({ limit: 10, reason: "r" }, "admin:t")]);
+    const count = (r: typeof a) => r.resumed.articles + r.resumed.group + r.resumed.digest + r.resumed.report;
+    assert.ok(count(a) <= 10 && count(b) <= 10, `round ${round}`);
+    assert.equal(a.resumed.articles + b.resumed.articles, 10, `round ${round}: each article once`);
+    assert.equal(count(a) + count(b), 16, `round ${round}: every item once`);
+    const [still] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM articles WHERE source_id = ${SOURCE} AND processing_state = 'budget_blocked'`;
+    assert.deepEqual([still!.n, (await sql`SELECT 1 FROM budget_blocked WHERE ref LIKE ${`%${T}%`}`).length], [0, 0]);
+  }
+  await sql`DELETE FROM audit_log WHERE action = 'budget-blocked.resume' AND actor = 'admin:t'`;
+});
+
+test("a WeChat account whose check the limits refused is asked again after its interval, not at the next quarter hour", async () => {
+  const mp = `${SOURCE}-mp`;
+  const cursor = (refusedMinutesAgo: number) => sql`
+    UPDATE sources SET cursor = ${sql.json({ lastCheckedAt: new Date(Date.now() - 86400_000).toISOString(), lastRefusedAt: new Date(Date.now() - refusedMinutesAgo * 60_000).toISOString() })} WHERE id = ${mp}`;
+  await sql`INSERT INTO sources (id, name, kind, config, interval_minutes, next_fetch_at) VALUES (${mp}, 'Test mp', 'mp_account', '{"ghid":"gh_test"}'::jsonb, 60, '2100-01-01')`;
+  try {
+    await cursor(20);
+    await scheduleMpReconcile();
+    assert.equal((await jobs(QUEUES.mpCheck, `mp:${mp}`)).length, 0, "refused 20 minutes ago, interval 60");
+    await cursor(61);
+    await scheduleMpReconcile();
+    assert.equal((await jobs(QUEUES.mpCheck, `mp:${mp}`)).length, 1);
+  } finally {
+    await sql`DELETE FROM pgboss.job WHERE singleton_key = ${`mp:${mp}`}`;
+    await sql`DELETE FROM sources WHERE id = ${mp}`;
+  }
 });
 
 test("the owner is told once a day that work is stopped by the limits; over the admin API it is listed and resumed", async () => {
@@ -218,7 +286,7 @@ test("the owner is told once a day that work is stopped by the limits; over the 
     const headers = { cookie: `aihot_admin=s-${T}`, "x-csrf-token": `csrf-${T}` };
     assert.equal((await app.inject({ method: "GET", url: "/api/admin/budget-blocked" })).statusCode, 401);
     const listed = await app.inject({ method: "GET", url: "/api/admin/budget-blocked", headers });
-    assert.deepEqual([listed.statusCode, listed.json().articles.count, listed.json().other], [200, 1, [{ kind: "group", n: 1, oldest: listed.json().other[0].oldest }]]);
+    assert.deepEqual([listed.statusCode, listed.json().articles.count, listed.json().other], [200, 1, [{ kind: "group", n: 1, resuming: 0, oldest: listed.json().other[0].oldest }]]);
     assert.equal((await app.inject({ method: "POST", url: "/api/admin/budget-blocked/resume", headers, payload: { limit: 5 } })).statusCode, 400, "a reason is required");
     const resumed = await app.inject({ method: "POST", url: "/api/admin/budget-blocked/resume", headers, payload: { limit: 5, reason: "价格已批准" } });
     assert.deepEqual([resumed.statusCode, resumed.json()], [200, { resumed: { articles: 1, group: 1, digest: 0, report: 0 }, left: 0 }]);

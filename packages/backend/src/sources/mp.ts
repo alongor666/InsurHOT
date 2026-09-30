@@ -125,18 +125,25 @@ export async function checkMpAccount(sourceId: string, reason: "schedule" | "man
         health = CASE WHEN ${soft} THEN health WHEN fail_count + 1 >= 3 THEN 'failing' ELSE 'degraded' END, updated_at = now()
       WHERE id = ${sourceId}`;
     await sql`UPDATE fetch_runs SET status = 'failed', finished_at = now(), new_count = ${created}, error = ${message} WHERE id = ${run!.id}`;
+    // The schedule looks again one interval after a refusal, not at its next quarter-hour run.
+    // (lastCheckedAt stays as it is: it also tells a first check from later ones.)
+    if (money) await sql`UPDATE sources SET cursor = coalesce(cursor, '{}'::jsonb) || ${sql.json({ lastRefusedAt: new Date().toISOString() })} WHERE id = ${sourceId}`;
     if (soft && !money) throw error; // retried by the queue
     return { sourceId, status: "failed" as const, error: message };
   }
 }
 
-/** Every enabled account is checked once per its interval (the paid list call is the cost). */
+/**
+ * Every enabled account is checked once per its interval (the paid list call is the cost). A check the
+ * monetary limits refused counts for the interval too: asking again every quarter of an hour changes nothing.
+ */
 export async function scheduleMpReconcile(now = new Date()) {
-  const rows = await sql<{ id: string; last: string | null; interval_minutes: number }[]>`
-    SELECT id, cursor->>'lastCheckedAt' AS last, interval_minutes FROM sources WHERE kind = 'mp_account' AND enabled`;
+  const rows = await sql<{ id: string; last: string | null; refused: string | null; interval_minutes: number }[]>`
+    SELECT id, cursor->>'lastCheckedAt' AS last, cursor->>'lastRefusedAt' AS refused, interval_minutes FROM sources WHERE kind = 'mp_account' AND enabled`;
   let enqueued = 0;
   for (const s of rows) {
-    const since = s.last ? now.getTime() - Date.parse(s.last) : Infinity;
+    const latest = Math.max(s.last ? Date.parse(s.last) : -Infinity, s.refused ? Date.parse(s.refused) : -Infinity);
+    const since = now.getTime() - latest;
     if (since <= s.interval_minutes * 60_000) continue;
     await enqueue(QUEUES.mpCheck, { sourceId: s.id, reason: "schedule" }, { singletonKey: `mp:${s.id}` });
     enqueued += 1;

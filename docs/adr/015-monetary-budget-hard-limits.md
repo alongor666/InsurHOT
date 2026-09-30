@@ -4,7 +4,7 @@
 
 > 2026-09-30 补记：ADR-002 第 2 步已删除 leaderboard 与 Codex 重置监控。`assertPaidOutboundDisabled()` 的调用点因此由四个变为三个（`artificial-analysis.ts` 已不存在），`monitor` capability 与 `x` 主体类别已从代码移除。随后 X 采集与引文翻译也已删除：SocialData 不再是经回执的 provider（五个变为四个：LLM、embeddings、Jina、Dajiala），`collect.socialdata` capability、`translate_quoted` 用途与 `quote` 主体类别已从代码移除。下文凡涉及它们的行按「已删除」读；正文是 `8b4526a` 时的现状记录，未逐行改写。
 
-> 2026-09-30 实施补记（M0.3b 第 3 步上半，状态仍为 Proposed）：「限 owner 角色」落实为 `admin_users.role = 'owner'`（迁移 0044），迁移后无人具有该角色，由数据库操作者授予，后台不提供授予入口；撤销价格批准不限 owner。告警阈值以建议值 80% 的常量实现；主体行的告警按类别合并为一条。这几处都待 owner 确认，见 `docs/development/m0-3b-operator-entries-evidence.md`。
+> 2026-09-30 实施补记（M0.3b 第 3 步上半，状态仍为 Proposed）：「限 owner 角色」落实为 `admin_users.role = 'owner'`（迁移 0044），迁移后无人具有该角色，由数据库操作者授予，后台不提供授予入口；撤销价格批准不限 owner。告警阈值以建议值 80% 的常量实现；主体行的告警按类别合并为一条。这几处都待 owner 确认，见 `docs/development/m0-3b-operator-entries-evidence.md`。第 8 节的实施（第 3 步下半）：缺价格、未批准等其余金额拒绝与月度耗尽同样处理；归组、综述、报告的停住记录在新表 `budget_blocked`（迁移 0045）；恢复限速由管理员每次恢复的条数决定，未做自动节流。见 `docs/development/m0-3b-budget-blocked-evidence.md`。
 
 ## 背景：现状（main `8b4526a`）
 

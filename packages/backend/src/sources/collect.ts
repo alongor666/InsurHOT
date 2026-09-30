@@ -164,8 +164,12 @@ export async function collectSource(sourceId: string, opts: { force?: boolean } 
         }
         // A date-only listing value gives way to the detail page's time on the same day.
         if (got.publishedAt && (!c.publishedAt || Math.abs(got.publishedAt.getTime() - c.publishedAt.getTime()) < DAY_MS)) c.publishedAt = got.publishedAt;
-      } catch {
-        // detail is best effort
+      } catch (error) {
+        // A refusal by the monetary limits (a paid detail page) ends the run as a soft failure: nothing
+        // of this round is stored, so the items come up again, with their details, once the limits allow.
+        // Stored now by their listing values alone, they would count as known and never be completed.
+        if (error instanceof MoneyRefusedError) throw error;
+        // Otherwise detail is best effort.
       }
     }
 

@@ -13,9 +13,15 @@ export const refusedByMoney = (error: unknown): error is MoneyRefusedError => er
 export async function blockForBudget(kind: BlockedKind, ref: string, error: MoneyRefusedError, job: Record<string, unknown> = {}): Promise<void> {
   await sql`
     INSERT INTO budget_blocked (kind, ref, job, reason) VALUES (${kind}, ${ref}, ${sql.json(job as never)}, ${error.message.slice(0, 500)})
-    ON CONFLICT (kind, ref) DO UPDATE SET job = EXCLUDED.job, reason = EXCLUDED.reason`;
+    ON CONFLICT (kind, ref) DO UPDATE SET job = EXCLUDED.job, reason = EXCLUDED.reason, resumed_at = NULL`;
 }
 
+/** Stopped and not resumed. A report an admin resumed is no longer blocked: the catch-up may compose it. */
 export async function isBudgetBlocked(kind: BlockedKind, ref: string): Promise<boolean> {
-  return (await sql`SELECT 1 FROM budget_blocked WHERE kind = ${kind} AND ref = ${ref}`).length > 0;
+  return (await sql`SELECT 1 FROM budget_blocked WHERE kind = ${kind} AND ref = ${ref} AND resumed_at IS NULL`).length > 0;
+}
+
+/** The work was done after all (resumed, or reached another way): its record goes, so that the alert and the next resume do not count it. */
+export async function clearBudgetBlock(kind: BlockedKind, ref: string): Promise<void> {
+  await sql`DELETE FROM budget_blocked WHERE kind = ${kind} AND ref = ${ref}`;
 }

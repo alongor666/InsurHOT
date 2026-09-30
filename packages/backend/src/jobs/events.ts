@@ -2,7 +2,7 @@
 import type { PgBoss } from "pg-boss";
 import { groupArticle } from "../events/group.ts";
 import { composeStoryDigest } from "../events/digest.ts";
-import { blockForBudget, refusedByMoney } from "./budget-blocked.ts";
+import { blockForBudget, clearBudgetBlock, refusedByMoney } from "./budget-blocked.ts";
 import { settleNonEditorial } from "./content.ts";
 import { ensureQueue, enqueue, QUEUES } from "./queue.ts";
 
@@ -18,6 +18,7 @@ export async function registerEventJobs(boss: PgBoss) {
       if (result.storyId && !result.verdict.startsWith("signal")) {
         await enqueue(QUEUES.digest, { storyId: result.storyId }, { singletonKey: `story:${result.storyId}`, startAfter: 60 });
       }
+      await clearBudgetBlock("group", job.data.articleId);
       return result;
     } catch (error) {
       return groupJobFailed(job.data, error);
@@ -27,7 +28,9 @@ export async function registerEventJobs(boss: PgBoss) {
   await boss.work<{ storyId: number; afterCorrection?: boolean }>(QUEUES.digest, { localConcurrency: 3, pollingIntervalSeconds: 5 }, async ([job]) => {
     if (!job) return;
     try {
-      return await composeStoryDigest(job.data.storyId, { afterCorrection: job.data.afterCorrection });
+      const result = await composeStoryDigest(job.data.storyId, { afterCorrection: job.data.afterCorrection });
+      await clearBudgetBlock("digest", String(job.data.storyId));
+      return result;
     } catch (error) {
       return digestJobFailed(job.data, error);
     }
