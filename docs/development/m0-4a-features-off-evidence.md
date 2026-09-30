@@ -6,7 +6,7 @@
 
 - [`industry/features.ts`](../../industry/features.ts)：`leaderboard`、`codexResetMonitor` 由 `true` 改为 `false`。没有删除任何代码、表或素材——删除是第 2 步。
 - [`tests/features-off.test.ts`](../../tests/features-off.test.ts)：4 项，固定关闭态的对外行为。
-- ADR-002 状态记为 Accepted；[行动计划](action-plan.md) M0.4 行写入 owner 的两项决定（批准 ADR-002；模块删除排在 M0.3b 第 3 步之前）。ADR-003、ADR-015 状态未动。
+- ADR-002 状态记为 Accepted；[行动计划](action-plan.md) M0.4 行与主规格 ADR 表同步这一状态，并记下顺序调整（模块删除排到 M0.3b 第 3 步之前；来源是实施会话的建议与 owner 随后的批准，没有单独的书面确认）。ADR-003、ADR-015 状态未动。
 
 ## 关闭态下的行为
 
@@ -15,7 +15,7 @@
 | 出口 | 关闭态 | 证据 |
 |---|---|---|
 | 站点接口 `/api/site/leaderboard/*`、`/api/site/codex-reset*` | 路由不注册，404 | 测试第 2 项 |
-| 公开接口 `/api/v1/codex-resets`、`/recent` | 404；OpenAPI 文档不含该路径 | 测试第 2、3 项 |
+| 公开接口 `/api/v1/codex-resets`、`/recent` | 404；OpenAPI 文档的 `paths` 不含该路径（`components.schemas` 里无人引用的 `CodexReset*` 仍随文档发布，见下文残留） | 测试第 2、3 项 |
 | 分享图 `/og/pages/leaderboard.png`、`/og/pages/codex-reset.png` | 404 | 测试第 2 项 |
 | 素材目录 `/model-providers/*`、`/leaderboard-sources/*` | 404 | 测试第 2 项 |
 | `llms.txt`、`sitemap.xml` | 不出现两模块的任何地址；即使告知"榜单已有一轮"也不列出 | 测试第 3 项 |
@@ -47,8 +47,13 @@
 这些不受开关控制，本步不处理：
 
 - 后台监控接口 `/api/admin/monitor/*`（[`apps/api/src/routes/admin.ts`](../../apps/api/src/routes/admin.ts) 7 条）始终注册，需管理员登录；web 的 `/admin/monitor` 路由也在，未登录时 302 到登录页。侧栏入口已随开关消失。
-- web 的页面路由（`apps/web/app/routes.ts` 里 leaderboard 6 条、codex-reset 2 条）仍登记，靠数据接口 404 才返回 404；`http-policy.ts` 里 `/leaderboard/methodology` 的 308 跳转仍在，跳转目标 404。
+- web 的页面路由（`apps/web/app/routes.ts` 里 leaderboard 6 条、codex-reset 2 条）仍登记，靠数据接口 404 才返回 404；`http-policy.ts` 里的跳转规则仍在：`/leaderboard/methodology` 308、`/leaderboard/category/(aesthetics|writing)` 307（目标都是 404）、`/leaderboard/category/overall` 固定 404、`/codex-reset/` 去尾斜杠。
+- 公开的 `/openapi-v1.json` 只删了 `paths`，`reference/public-v1.openapi.json` 里的 `CodexReset*` 组件 schema 仍随文档发布，没有路径引用它们。
+- 只有管理员可见或库空时不产生任何输出的部分：`operations/alerts.ts` 的 `monitor.stuck`、`monitor.review`、`leaderboard.fetch` 三个告警查询；后台运行页的榜单面板（`admin/runs.ts`、`routes/admin/runs.tsx`）；`admin.ts` 的侧栏计数 SQL。
+- 脚本 `scripts/lb-round.ts`、`lb-fetch-check.ts`、`import-leaderboard-prices.ts` 不看开关；CI 与 `package.json` 都不调用它们。
 - worker 的监控与榜单队列处理器、X 采集（`x_search`、SocialData）、引文翻译、`assets/model-providers`、相关表与 seeds、`tests/paid-lock-blocked*.txt` 中对应条目。X 采集与引文翻译没有开关，本步对它们没有任何影响；它们由采集开关与付费闭锁挡住。
+
+第一轮独立评审（绑定 `2178f2f`，APPROVE，6 项 P3）指出的清单遗漏、一个不起区分作用的测试 URL 与两处文档措辞已在本版处理；`CodexReset*` schema 留到第 2 步随参考文档一起删。
 
 ## 未运行
 

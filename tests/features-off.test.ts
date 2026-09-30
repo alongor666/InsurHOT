@@ -29,7 +29,7 @@ test("both optional modules are off", () => {
 
 test("their public and site APIs, share images and asset folders answer 404; the rest of the site still answers", async () => {
   const gone = [
-    "/api/site/leaderboard/rules", "/api/site/leaderboard/sources", "/api/site/leaderboard/sources/arena", "/api/site/leaderboard/boards/overall", "/api/site/leaderboard/models/any",
+    "/api/site/leaderboard/rules", "/api/site/leaderboard/sources", "/api/site/leaderboard/boards/overall", "/api/site/leaderboard/models/any",
     "/api/site/codex-reset", "/api/site/codex-reset/version", "/api/site/codex-reset/days/2026-09-30", "/api/v1/codex-resets", "/api/v1/codex-resets/recent",
     "/og/pages/leaderboard.png", "/og/pages/codex-reset.png", "/model-providers/openai.svg", "/leaderboard-sources/arena.svg",
   ];

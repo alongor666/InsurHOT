@@ -1,9 +1,9 @@
-(node:71399) [FSTDEP023] FastifyDeprecation: disableRequestLogging option is deprecated. Use the logController option with disableRequestLogging or isLogDisabled override instead. The disableRequestLogging top-level option will be removed in `fastify@6`.
+(node:90667) [FSTDEP023] FastifyDeprecation: disableRequestLogging option is deprecated. Use the logController option with disableRequestLogging or isLogDisabled override instead. The disableRequestLogging top-level option will be removed in `fastify@6`.
 (Use `node --trace-warnings ...` to show where the warning was created)
-✔ both optional modules are off (548.256458ms)
-✔ their public and site APIs, share images and asset folders answer 404; the rest of the site still answers (125.625125ms)
-✔ the machine-readable exits no longer name them (5.367167ms)
-✔ no scheduled job belongs to them, whatever the collection switch says (75.032083ms)
+✔ both optional modules are off (308.670667ms)
+✔ their public and site APIs, share images and asset folders answer 404; the rest of the site still answers (47.359292ms)
+✔ the machine-readable exits no longer name them (1.603417ms)
+✔ no scheduled job belongs to them, whatever the collection switch says (32.405459ms)
 ℹ tests 4
 ℹ suites 0
 ℹ pass 4
@@ -11,5 +11,5 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 1386.650667
+ℹ duration_ms 815.392125
 exit=0
