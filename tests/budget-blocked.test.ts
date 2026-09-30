@@ -233,8 +233,11 @@ test("a resumed report is composed by the catch-up whatever its age; refused aga
     asked.length = 0;
     assert.deepEqual((await composeResumedReports(compose, 2)).composed, more.slice(0, 2));
     assert.deepEqual(asked, more.slice(0, 2));
+    const waitingSince = async () => (await sql<{ at: Date }[]>`SELECT resumed_at AS at FROM budget_blocked WHERE ref = ${broken}`)[0]!.at.getTime();
+    const before = await waitingSince();
     const next = await composeResumedReports(compose, 2);
     assert.deepEqual([next.composed, next.failed.length, asked.slice(2)], [[more[2]], 1, [more[2], broken]]);
+    assert.ok((await waitingSince()) > before, "the one that failed again is moved behind whatever is resumed meanwhile");
   } finally {
     await sql`DELETE FROM reports WHERE kind = 'daily' AND key = ${exists.slice(6)}`;
     await sql`DELETE FROM budget_blocked WHERE ref LIKE ${`%${T}%`}`;

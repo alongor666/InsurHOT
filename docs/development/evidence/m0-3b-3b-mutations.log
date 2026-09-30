@@ -87,3 +87,12 @@
 ## mutation: a report that failed keeps its place at the front of the line
 ℹ pass 11
 ℹ fail 0
+
+# ---- after review round 2, with the assertion added for the second mutation ----
+## no mutation
+ℹ pass 11
+ℹ fail 0
+## mutation: a report that failed keeps its place at the front of the line
+✖ a resumed report is composed by the catch-up whatever its age; refused again it is stopped again; one that exists already just loses its mark
+ℹ pass 10
+ℹ fail 1
