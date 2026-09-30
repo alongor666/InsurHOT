@@ -7,7 +7,7 @@
 - 隔离 worktree detach 在上述 main SHA；`npm ci --ignore-scripts`；Node v25.5.0（满足 `engines >=24.11`；CI 用 Node 24）。
 - 临时库 `insurhot_test`（满足 `tests/setup.ts` 的 `*_test` 约束），每轮 `drop/create` 重建；未连接任何非临时库。
 - 环境：`DATABASE_URL=postgres://<local-user>@127.0.0.1:5432/insurhot_test`、`SITE_URL`/`API_BASE_URL` 指向 127.0.0.1、测试用 `SESSION_SECRET`/`IMG_PROXY_SIGN_SECRET`、`COLLECT_ENABLED=false`、`MODEL_CALLS_ENABLED=false`。变量集合沿用 `docs/upstream/workflows/check.yml`，但两处不同：check.yml 只在 smoke 步骤显式设 `COLLECT/MODEL=false`，backend tests 步骤为未设置（M0.3a 下效果相同）；CI 用 PG 17 + Node 24，本机是 PG 18.1 + Node 25.5。
-- 日志脱敏规则：`"hostname":"…"` → `redacted`；worktree 与仓库绝对路径 → `<repo>`；`postgres://<user>@` → `<local-user>`。除此之外未改动日志内容；每份日志末尾的 `exit=N` 由运行命令时 `echo "exit=$?"` 追加。
+- 日志脱敏规则：`"hostname":"…"` → `redacted`；worktree 与仓库绝对路径 → `<repo>`；`postgres://<user>@` → `<local-user>`。除此之外未改动日志内容；迁移/seed/web 日志末尾的 `exit=N` 由运行命令时 `echo "exit=$?"` 追加；`m0-pg-backend-tests.log` 沿用第一轮的运行结果未重生成，末尾为 `backend tests exit=1`。
 - 未启动 API/worker 监听、未做 Docker smoke（本机无 Docker）。
 
 ## 结果
@@ -25,7 +25,7 @@
 
 ## 失败归因
 
-59 条（56 fail + 3 cancelled）中，**29 条可从日志直接确认**为 M0.3a 门控（模型门 20、采集门 9）；**其余 30 条为推断**（二阶后果 27、超时 3）——日志只有断言结果（`'failed' !== 'ok'`、`0 !== 30`、`undefined.status` 等），`LOG_LEVEL=error` 压掉了采集失败的底层原因，未做反事实重跑。在日志中全文搜索 relation/column/syntax error/ECONNREFUSED/deadlock/constraint/violates/duplicate key 均无命中，因此"无数据库相关失败"只在日志层面成立。
+59 条（56 fail + 3 cancelled）中，**29 条可从日志直接确认**为 M0.3a 门控（模型门 20、采集门 9）；**其余 30 条为推断**（付费闭锁 5，其中 3 条为超时取消；二阶后果 25）——日志只有断言结果（`'failed' !== 'ok'`、`0 !== 30`、`undefined.status` 等），`LOG_LEVEL=error` 压掉了采集失败的底层原因，未做反事实重跑。在日志中全文搜索 relation/column/syntax error/ECONNREFUSED/deadlock/constraint/violates/duplicate key 均无命中，因此"无数据库相关失败"只在日志层面成立。
 
 | 类别 | 直接错误 | 涉及文件（失败/取消数） |
 |---|---|---|
@@ -40,7 +40,7 @@
 
 - 上游测试把 provider 指向本地 stub（`tests/setup.ts` 的 `stub()`），门控开关在 `tests/setup.ts` 里没有设置，所以默认拒绝会拦住它们。M0.3a 证据已预告这一点。
 - 采集门是"字面值 true 即放行"的免费路径；模型/embeddings/SocialData/Jina/Dajiala 全部经 `paidRequest`，闭锁无环境旁路，在 M0.3b 前无法通过。
-- **只开 `COLLECT_ENABLED=true` 并不安全**（独立评审 P1）：被门控的测试文件普遍设置 `allowPrivateNetworkFetch=true`，此时 `assertPublicUrl` 直接放行、`dispatcherFor` 不再挂 `guardedLookup`，测试进程可访问任意公网地址。因此 #10 需先增加一个请求层的仅-loopback 拦截（按主机名在 DNS 前拒绝、连接时再核对实际地址，覆盖代理与 `ALLOW_PRIVATE_NETWORK_FETCH`），并以测试证明公网名称与重定向到公网均被拒；在此之后才在测试进程内开采集门。该拦截在 PR #19 以 `OUTBOUND_LOOPBACK_ONLY` 实现。
+- **只开 `COLLECT_ENABLED=true` 并不安全**（独立评审 P1）：被门控的测试文件普遍设置 `allowPrivateNetworkFetch=true`，此时 `assertPublicUrl` 直接放行、`dispatcherFor` 不再挂 `guardedLookup`，测试进程可访问任意公网地址。因此 #10 需先增加一个请求层的仅-loopback 拦截（按主机名在 DNS 前拒绝、连接时再核对实际地址，覆盖代理与 `ALLOW_PRIVATE_NETWORK_FETCH`），并以测试证明公网名称与重定向到公网均被拒；在此之后才在测试进程内开采集门。该拦截在 PR #19 以 `OUTBOUND_LOOPBACK_ONLY` 实现；#19 尚未合并、未经独立评审，不构成本文档的前置条件已满足。
 - 仍依赖 `paidRequest` 的用例按文件/用例列清单排除并记原因（#19 的 `tests/paid-lock-blocked*.txt`），待 M0.3b 解除；每个被门控的用例都是上游行为的回归证据，不删除。
 
 ## 未声称的性质
