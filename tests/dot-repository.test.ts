@@ -50,11 +50,12 @@ test("a delivery is stored once with its items; a repeat returns the first recei
   assert.deepEqual([again.status, again.itemCount, again.receivedAt, again.firstSeenAt], ["duplicate", 3, "2026-09-30T09:00:00.000Z", "2026-09-30T09:00:00.000Z"]);
   assert.deepEqual(await counts(body.deliveryId), { deliveries: 1, items: 3 });
 
-  const [item] = await sql<{ rights_status: string; publication_status: string; evidence_status: string; summary: string; original_sources: { publishedAt: string | null }[]; received_at: Date; dot_observed_at: Date }[]>`
-    SELECT rights_status, publication_status, evidence_status, summary, original_sources, received_at, dot_observed_at
+  const [item] = await sql<{ rights_status: string; publication_status: string; evidence_status: string; summary: string; pillars: string[]; original_sources: { publishedAt: string | null }[]; received_at: Date; dot_observed_at: Date }[]>`
+    SELECT rights_status, publication_status, evidence_status, summary, pillars, original_sources, received_at, dot_observed_at
     FROM dot_items WHERE delivery_id = ${body.deliveryId} AND item_id = 'item-1'`;
   assert.deepEqual([item!.rights_status, item!.publication_status, item!.evidence_status], ["unknown", "private", "unverified"]);
   assert.equal(item!.summary, "Summary 1 保险 😀");
+  assert.deepEqual(item!.pillars, ["changes"], "the text[] binding round-trips");
   assert.equal(item!.original_sources[0]!.publishedAt, null);
   assert.equal(item!.received_at.toISOString(), "2026-09-30T09:00:00.000Z");
   assert.equal(item!.dot_observed_at.toISOString(), "2026-09-29T08:00:00.000Z", "Dot's own time is kept apart from the server's");

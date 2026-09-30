@@ -34,7 +34,7 @@
 
 ## 未声称的性质
 
-PG repository以事务及唯一键设计批次原子性/并发幂等；该行为已在本机 PostgreSQL 18.1 上由 `tests/dot-repository.test.ts` 实测（见上表），未在 PG 17（CI 镜像）以外的版本或多副本部署下验证。跨delivery的事件/itemId去重、许可认定、原文证据提取、三支柱读取、撤回和公网发布均不属于D1已实现范围。producer=dot是声明的处理来源；token证明提交权限，不证明作者身份或所有内容正确。
+PG repository以事务及唯一键设计批次原子性/并发幂等；该行为仅在本机 PostgreSQL 18.1 上由 `tests/dot-repository.test.ts` 实测（见上表）；PG 17（CI 镜像）以本 PR 的 Actions 结果为准；未在多副本部署下验证。并发用例的局限：8 路/6 路请求同一 tick 发出、连接池 max=10，大概率真并发，但即使退化为串行执行断言同样成立——它们证明的是结果正确（一份入库、其余判重或 409），不证明确实走过唯一键等待路径。未覆盖的风险（记录，不在本 PR 处理）：每条 item 单独一次往返、一个事务最多 51 条语句并占用一个连接，并发大批次可能占满 max=10 的共享池；`dot_observed_at` 的小数秒超过微秒会被 PG 截断（哈希按原字符串算，不影响幂等）。跨delivery的事件/itemId去重、许可认定、原文证据提取、三支柱读取、撤回和公网发布均不属于D1已实现范围。producer=dot是声明的处理来源；token证明提交权限，不证明作者身份或所有内容正确。
 
 未调用旧ingestItems/queueProcessing；未启动worker或API listener；没有真实采集、模型/embedding付费、飞书/IndexNow推送、远程备份或生产部署。锁文件、LICENSE/NOTICE及第三方许可不改。M0.3b/M0.4/M0.5仍未完成。
 
