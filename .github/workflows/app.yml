@@ -1,10 +1,9 @@
 name: Application checks
-# This repository's own application CI (Issue #10): typecheck, web build and tests, migrations and
-# backend tests against a throwaway PostgreSQL. Model calls and pushes stay off; the backend tests opt
+# This repository's own application CI (Issues #10, #13): typecheck, web build and tests, migrations,
+# the built site's smoke check and the backend tests against a throwaway PostgreSQL, and the Docker
+# image brought up with docker compose. Model calls and pushes stay off; the backend tests opt
 # themselves into collection restricted to this host (tests/setup.ts: OUTBOUND_LOOPBACK_ONLY), and paid
-# providers stay locked. Deferred to M0.5 (Issue #13): the Docker smoke and the upstream "built site"
-# smoke (starting API + web and running scripts/smoke.ts), which needs the M0.4 brand/module cleanup
-# first so it checks the right pages. Not the upstream CI.
+# providers stay locked. Not the upstream CI.
 on:
   pull_request:
   push:
@@ -59,8 +58,80 @@ jobs:
         run: |
           node scripts/migrate.ts
           node scripts/seed.ts --topics-only
+      - name: Smoke check of the built site
+        # Before the backend tests, which write their own rows: this reads the freshly seeded database.
+        run: |
+          node apps/api/src/main.ts > "$RUNNER_TEMP/api.log" 2>&1 &
+          api=$!
+          (cd apps/web && NODE_ENV=production exec node server.ts) > "$RUNNER_TEMP/web.log" 2>&1 &
+          web=$!
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://127.0.0.1:3000/api/health 2>/dev/null && break; sleep 1; done
+          node scripts/smoke.ts --base http://127.0.0.1:3000
+          # The backend tests that follow get the database and the ports to themselves: both servers close
+          # their connections on SIGTERM, so wait until they have exited.
+          kill "$api" "$web"
+          wait "$api" "$web" || true
       - name: Backend tests (paid-lock-blocked files and cases excluded, see tests/paid-lock-blocked*.txt)
         run: bash scripts/test-unlocked.sh
-      - name: Dependency audit (report only until M0.5 decides the threshold)
+      - name: Server logs
+        if: failure()
+        run: tail -n 60 "$RUNNER_TEMP/api.log" "$RUNNER_TEMP/web.log" 2>/dev/null || true
+      - name: Dependency audit (report only; the threshold is not decided yet, Issue #13)
         continue-on-error: true
         run: npm audit --audit-level=high
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Configure a throwaway site
+        run: |
+          # Random secrets for this run only; the admin password it prints is not shown in the log.
+          node scripts/init-env.ts --llm-key ci-not-a-real-key > /dev/null
+          # No outside calls in CI: nothing is collected and no model is asked (paid providers are locked anyway).
+          sed -i 's/^COLLECT_ENABLED=.*/COLLECT_ENABLED=false/; s/^MODEL_CALLS_ENABLED=.*/MODEL_CALLS_ENABLED=false/' .env
+          grep -q '^COLLECT_ENABLED=false$' .env && grep -q '^MODEL_CALLS_ENABLED=false$' .env
+          # The smoke check reaches the site by its compose service name.
+          echo "MCP_ALLOWED_HOSTS=web" >> .env
+      - name: Build and start with docker compose
+        run: docker compose up -d --build
+      - name: Smoke check
+        run: |
+          for i in $(seq 1 90); do curl -fsS -o /dev/null http://127.0.0.1:3000/api/health 2>/dev/null && break; sleep 2; done
+          docker compose ps
+          docker compose run --rm --no-deps --entrypoint node setup scripts/smoke.ts --base http://web:3000
+          # Every role is still up a while after starting, the worker included (the smoke check only reaches
+          # web and api), and none has been restarted: a role that crashes is restarted by compose and would
+          # otherwise look "running". Each compared value is printed so the log shows what was checked.
+          sleep 20
+          docker compose ps
+          running="$(docker compose ps --status running --services | sort | tr '\n' ' ')"
+          echo "running services: $running"
+          test "$running" = "api db web worker "
+          for s in api web worker; do
+            state="$(docker inspect -f '{{.State.Status}} restarts={{.RestartCount}}' "$(docker compose ps -q "$s")")"
+            echo "$s: $state"
+            test "$state" = "running restarts=0"
+          done
+          # The setup service migrated and seeded: every migration is recorded and the demo sources are there.
+          recorded="$(docker compose exec -T db psql -U aihot -d aihot -Atc 'select count(*) from schema_migrations')"
+          files="$(ls database/migrations/*.sql | wc -l | tr -d ' ')"
+          echo "migrations recorded: $recorded, migration files: $files"
+          test "$recorded" = "$files"
+          seeded="$(docker compose exec -T db psql -U aihot -d aihot -Atc 'select count(*) from sources')"
+          listed="$(node -e 'console.log(JSON.parse(require("fs").readFileSync("industry/sources.json","utf8")).sources.length)')"
+          echo "sources in the database: $seeded, in industry/sources.json: $listed"
+          test "$seeded" = "$listed"
+      - name: Logs
+        if: failure()
+        run: docker compose logs --tail 80
+      - name: Stop
+        if: always()
+        run: docker compose down -v
