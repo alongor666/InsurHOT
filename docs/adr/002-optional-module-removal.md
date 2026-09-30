@@ -1,6 +1,6 @@
 # ADR-002：删除上游可选模块与 AI 行业专用采集
 
-状态：Accepted（owner 于 2026-09-30 在实施会话中批准，含把范围扩大到 X 采集、引文翻译与 `assets/model-providers`，以及第 2 步不可自动回退的 drop 表迁移；正文由 Claude 会话于同日起草；批准时只把「建议」「需 owner 确认」等措辞改为已批准状态，两步走、范围与保留项等决定实质未改）。第 1 步证据见 [`m0-4a-features-off-evidence.md`](../development/m0-4a-features-off-evidence.md)。Refs #4、#12。
+状态：Accepted（owner 于 2026-09-30 在实施会话中批准，含把范围扩大到 X 采集、引文翻译与 `assets/model-providers`，以及第 2 步不可自动回退的 drop 表迁移；正文由 Claude 会话于同日起草；批准时只把「建议」「需 owner 确认」等措辞改为已批准状态，两步走、范围与保留项等决定实质未改）。第 1 步证据见 [`m0-4a-features-off-evidence.md`](../development/m0-4a-features-off-evidence.md)。第 2 步分两个 PR 实施：leaderboard、monitor 与 `assets/model-providers` 的删除见 [`m0-4b-remove-leaderboard-monitor-evidence.md`](../development/m0-4b-remove-leaderboard-monitor-evidence.md)；X 采集与引文翻译的删除未实施。实施时 `industry/features.ts` 选择了整个删除。Refs #4、#12。
 
 ## 背景
 

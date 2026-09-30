@@ -8,7 +8,7 @@ import { sql } from "../db.ts";
 import { postWebhook } from "./feishu.ts";
 
 export interface DeliveryRequest {
-  subjectKind: "codex_reset" | "selected";
+  subjectKind: "selected";
   subjectId: string;
   dedupeKey: string;
   /** When the underlying content appeared; older than a target's enabled_at means skip. */
