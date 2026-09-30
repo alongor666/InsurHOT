@@ -277,6 +277,7 @@ export default function AboutPage() {
         </Link>
         联系我们。
       </p>
+      {ABOUT.acknowledgement && <p className="mt-3 px-5 text-[12px] leading-[1.8] text-ink-3">{ABOUT.acknowledgement}</p>}
 
       <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5 text-[12.5px] text-ink-4">
         <span>{SITE.footerNote}</span>

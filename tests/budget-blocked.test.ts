@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { after, before, test } from "node:test";
+import { SESSION_COOKIE } from "@aihot/backend/admin/auth";
 import { budgetBlockedOverview, resumeBudgetBlocked } from "@aihot/backend/admin/budget-blocked";
 import { REPO_ROOT } from "@aihot/backend/config";
 import { upsertMaterial } from "@aihot/backend/content/materials";
@@ -296,7 +297,7 @@ test("the owner is told once a day that work is stopped by the limits; over the 
   try {
     const [user] = await sql<{ id: number }[]>`INSERT INTO admin_users (email, display_name) VALUES (${`blocked-${T}@test.invalid`}, 'admin') RETURNING id`;
     await sql`INSERT INTO admin_sessions (id_hash, user_id, csrf_token, expires_at) VALUES (${sha256(`s-${T}`)}, ${user!.id}, ${`csrf-${T}`}, now() + interval '1 hour')`;
-    const headers = { cookie: `aihot_admin=s-${T}`, "x-csrf-token": `csrf-${T}` };
+    const headers = { cookie: `${SESSION_COOKIE}=s-${T}`, "x-csrf-token": `csrf-${T}` };
     assert.equal((await app.inject({ method: "GET", url: "/api/admin/budget-blocked" })).statusCode, 401);
     const listed = await app.inject({ method: "GET", url: "/api/admin/budget-blocked", headers });
     assert.deepEqual([listed.statusCode, listed.json().articles.count, listed.json().other], [200, 1, [{ kind: "group", n: 1, resuming: 0, oldest: listed.json().other[0].oldest }]]);

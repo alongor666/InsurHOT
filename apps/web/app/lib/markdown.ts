@@ -10,9 +10,9 @@ function inline(s: string): string {
   out = out.replace(/`([^`]+)`/g, "<code>$1</code>");
   out = out.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text: string, href: string) => {
-    const external = /^https?:\/\//.test(href) && !/^https:\/\/aihot\.news/.test(href);
-    const h = href.replace(/^https:\/\/aihot\.news(?=\/)/, "");
-    return `<a href="${h}"${external ? ' target="_blank" rel="noopener noreferrer"' : ""}>${text}</a>`;
+    // Our own pages link relatively; anything with a scheme is another site.
+    const external = /^https?:\/\//.test(href);
+    return `<a href="${href}"${external ? ' target="_blank" rel="noopener noreferrer"' : ""}>${text}</a>`;
   });
   // Bare URLs.
   out = out.replace(/(^|[\s（(])((?:https?:\/\/)[^\s<）)]+)/g, (_m, pre: string, url: string) => `${pre}<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`);
