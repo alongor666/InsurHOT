@@ -125,7 +125,7 @@ DOT_INGEST_TOKEN=<专用凭据> node scripts/dot-bridge.ts --inbox <收件目录
 
 ## 验证（本机，PostgreSQL 18.1，一次性库 `*_test`）
 
-`tests/dot-bridge.test.ts`，11 个用例（评审第 1 轮时是 8 个）：在测试进程里把本仓的 API 应用监听在 `127.0.0.1` 的临时端口，启用接收并使用每次运行随机生成的凭据；批次是合成数据。文档里那份给 Dot 的合法样例，测试没有提交过它。
+`tests/dot-bridge.test.ts`，12 个用例（评审第 1 轮时是 8 个）：在测试进程里把本仓的 API 应用监听在 `127.0.0.1` 的临时端口，启用接收并使用每次运行随机生成的凭据；批次是合成数据。文档里那份给 Dot 的合法样例由一个用例从本文档里取出，交给接收端的校验函数，确认它被接受。
 
 - 交付一次并归档，库里一行批次一行条目；同一文件重交付与「同内容、键序不同」都是 `duplicate`，库里不新增，回执时间等于首次接收时间。
 - 同 `deliveryId` 不同内容得到 409，未知字段得到 400，都进入 `rejected/`；库里原批次的哈希不变。
@@ -141,7 +141,7 @@ DOT_INGEST_TOKEN=<专用凭据> node scripts/dot-bridge.ts --inbox <收件目录
 命令与结果：
 
 - `npm run typecheck`：通过（[日志](evidence/dot-d2-typecheck.log)）。`scripts/dot-bridge.ts` 本身不在类型检查范围内（仓库的 `scripts/` 都不在），它只有十几行，逻辑在被检查的 `packages/backend/src/ingest/dot-bridge.ts` 里，并由子进程用例实际运行。
-- `bash scripts/test-unlocked.sh`：29 个文件，182/182，跳过清单 11 条不变（[日志](evidence/dot-d2-unlocked.log)）。
+- `bash scripts/test-unlocked.sh`：29 个文件，183/183，跳过清单 11 条不变（[日志](evidence/dot-d2-unlocked.log)）。
 - 变异验证（[日志](evidence/dot-d2-mutations.log)，前半是第 1 轮评审前的 14 项，后半是重写之后的 22 项）：重写后的 22 项都让用例失败——不核对身份就拿走文件、按路径归档、回执与归档同目录同名、拒收文件名不查原因文件、不检查 `ok`、不检查 2xx、把凭据写进不可达分支的台账、把「文件已不在」当错误、打开时跟随链接、不恢复 `.aside/`、空锁一律当遗留、跟随重定向、409 当作重试、503 当作永久拒绝、发送刚修改的文件、使用不安全的 `deliveryId`、发送超限文件、接受别的批次的回执、凭据被拒后继续发送、忽略锁、脚本接受 `--token`、接受到其他主机的明文 http。两次变异第一次写得无效（一次无法编译，一次只去掉了两道大小检查中的一道），日志里都保留并注明，重做后有效。
 
 ## 评审第 1 轮后的修改

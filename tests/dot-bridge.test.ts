@@ -16,6 +16,7 @@ import type { FastifyInstance } from "fastify";
 import { REPO_ROOT } from "@aihot/backend/config";
 import { closeDb, sql } from "@aihot/backend/db";
 import { BridgeConfigError, bridgeEndpoint, exitCodeFor, runDotBridge, type BridgeSummary } from "@aihot/backend/ingest/dot-bridge";
+import { parseDotDelivery } from "@aihot/backend/ingest/dot";
 import { stopBoss } from "@aihot/backend/jobs/queue";
 import { DOT_BODY_LIMIT } from "@aihot/contracts/dot-ingest";
 
@@ -416,4 +417,16 @@ test("from the command line: the summary and the exit code; the token comes from
   const written = everything(dir) + done.stdout + done.stderr + refused.stdout + refused.stderr;
   assert.ok(written.includes(id) && !written.includes(TOKEN) && !written.includes(wrongToken));
   assert.deepEqual([lstatSync(path.join(dir, "ledger.jsonl")).mode & 0o777, lstatSync(path.join(dir, "receipts", `${id}.json`)).mode & 0o777], [0o600, 0o600]);
+});
+
+test("the sample batch in the instructions for Dot is one the intake accepts", () => {
+  const doc = readFileSync(path.join(REPO_ROOT, "docs/development/dot-d2-file-bridge.md"), "utf8");
+  const block = /^> ```json\n((?:> .*\n|>\n)+?)> ```$/m.exec(doc);
+  assert.ok(block, "the document carries a quoted JSON sample");
+  const sample = JSON.parse(block[1]!.split("\n").map((l) => l.replace(/^> ?/, "")).join("\n"));
+  const parsed = parseDotDelivery(sample);
+  assert.deepEqual([parsed.schemaVersion, parsed.items.length, Buffer.byteLength(JSON.stringify(sample)) < DOT_BODY_LIMIT], ["insurhot.dot.v1", 1, true]);
+  // And a field the instructions forbid is what the intake refuses.
+  assert.throws(() => parseDotDelivery({ ...sample, note: "extra" }));
+  assert.throws(() => parseDotDelivery({ ...sample, items: [{ ...sample.items[0], dotObservedAt: "2026-09-30 08:30" }] }), "a time without a zone");
 });
