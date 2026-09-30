@@ -1,0 +1,7 @@
+topics: 38
+sources: 18 added, 0 already there
+exit=0
+$ psql -d insurhot_test -Atc "select count(*) from lb_models"
+0
+$ psql -d insurhot_test -Atc "select count(*) from sources"
+38

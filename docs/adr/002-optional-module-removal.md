@@ -1,6 +1,6 @@
 # ADR-002：删除上游可选模块与 AI 行业专用采集
 
-状态：Proposed（2026-09-30，Claude 会话起草，供 owner 裁决；按 `docs/phase0/delivery-gates.md` §5，模块删除属 Codex 可逆技术裁决，但本 ADR 把范围从"leaderboard/monitor"扩大到 AI 行业专用采集，且第 2 步含不可自动回退的 drop 表迁移，扩大部分与 drop 步骤需 owner 确认）。Refs #4、#12。
+状态：Accepted（owner 于 2026-09-30 在实施会话中批准，含把范围扩大到 X 采集、引文翻译与 `assets/model-providers`，以及第 2 步不可自动回退的 drop 表迁移；正文由 Claude 会话于同日起草，批准时未改动决定内容）。第 1 步证据见 [`m0-4a-features-off-evidence.md`](../development/m0-4a-features-off-evidence.md)。Refs #4、#12。
 
 ## 背景
 
@@ -40,12 +40,12 @@
 | 0001 | `sources.kind` CHECK 含 `'x_search'`；列 `articles.x_post`（`publication/feeds.ts`、`publication/items.ts`、`editorial/input.ts`、`translate.ts`、`publication/publish.ts`、`detail.ts` 等 `channel='x'` 发布路径引用）；`publications.channel CHECK (channel IN ('news','x'))`（`0001_core.sql:227`） | 新迁移收窄 `sources.kind` CHECK、收窄 `publications.channel` 为 `('news')`；`x_post` 列与 `channel='x'` 路径一并移除，消费方逐处清理 |
 | 0022 | 预置 `socialdata` 预算行 | 新迁移删除该行 |
 
-## 决定（建议）
+## 决定
 
 分两步，每步独立 PR：
 
 1. **先关后删**（可逆）：把 `FEATURES.leaderboard` 与 `FEATURES.codexResetMonitor` 置 `false`，验证 15 个消费方在关闭态下导航无入口、路由与接口 404、调度不注册、sitemap/llms.txt 不列出、smoke 与 seed 不依赖。回退只改两个布尔值。
-2. **再删**（drop 表不可自动回退，需 owner 确认）：按盘点删除 leaderboard、monitor、X 采集（`x_search` 信源类型、SocialData provider、`x_article`/`x_post` 列及 `channel='x'` 发布路径）、引文翻译与 `assets/model-providers`；同步删除对应 contracts、路由、调度、脚本、测试与 seeds；新增一个迁移按上表 drop 表/列、收窄 `sources.kind` CHECK、删除 `socialdata` 预算行，不改写历史迁移文件。完成条件：`npm run typecheck`、`grep` 无残留引用、应用 CI 绿、上表"保留"对象仍存在且推送测试（`tests/alerts.test.ts`、`tests/feedback*.test.ts`）通过。
+2. **再删**（drop 表不可自动回退；owner 已确认）：按盘点删除 leaderboard、monitor、X 采集（`x_search` 信源类型、SocialData provider、`x_article`/`x_post` 列及 `channel='x'` 发布路径）、引文翻译与 `assets/model-providers`；同步删除对应 contracts、路由、调度、脚本、测试与 seeds；新增一个迁移按上表 drop 表/列、收窄 `sources.kind` CHECK、删除 `socialdata` 预算行，不改写历史迁移文件。完成条件：`npm run typecheck`、`grep` 无残留引用、应用 CI 绿、上表"保留"对象仍存在且推送测试（`tests/alerts.test.ts`、`tests/feedback*.test.ts`）通过。
 
 保留：`industry/features.ts` 文件（改为空对象或删除由实施时定），SocialData 以外的采集通道（RSS/web_list/json_list/mp_account/external），`notify_*`/`deliveries*` 表。
 
@@ -63,4 +63,4 @@
 
 ## 回退
 
-步骤 1：还原两个布尔值。步骤 2：revert 删除提交可恢复代码；drop 迁移不可自动回退——删除前在临时 PG 导出被删对象的 DDL 与行数记录，回退需按记录重建（当前无生产数据，代价为零）。这也是第 2 步需 owner 确认的原因。
+步骤 1：还原两个布尔值。步骤 2：revert 删除提交可恢复代码；drop 迁移不可自动回退——删除前在临时 PG 导出被删对象的 DDL 与行数记录，回退需按记录重建（当前无生产数据，代价为零）。这也是第 2 步单独取得 owner 确认的原因。
