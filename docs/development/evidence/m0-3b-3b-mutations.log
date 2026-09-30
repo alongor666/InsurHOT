@@ -75,3 +75,15 @@
 ✖ a WeChat account whose check the limits refused is asked again after its interval, not at the next quarter hour
 ℹ pass 10
 ℹ fail 1
+
+# ---- after review round 2 ----
+## no mutation
+ℹ pass 11
+ℹ fail 0
+## mutation: a catch-up run composes every resumed report (the round-2 code)
+✖ a resumed report is composed by the catch-up whatever its age; refused again it is stopped again; one that exists already just loses its mark
+ℹ pass 10
+ℹ fail 1
+## mutation: a report that failed keeps its place at the front of the line
+ℹ pass 11
+ℹ fail 0

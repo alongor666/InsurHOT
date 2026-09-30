@@ -225,6 +225,16 @@ test("a resumed report is composed by the catch-up whatever its age; refused aga
     // Composed and already-there are gone; refused again is stopped again; the other failure waits, still resumed, for the next run.
     assert.deepEqual(left.map((r) => [r.ref, r.resumed]), [[broken, true], [again, false]].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
     assert.equal(await isBudgetBlocked("report", again), true);
+
+    // A run composes a bounded number, the longest-waiting first; the one that failed went to the back of the line.
+    const more = [1, 2, 3].map((i) => `daily:2030-03-0${i}-${T}`);
+    for (const ref of more) await blockForBudget("report", ref, usedUp());
+    await sql`UPDATE budget_blocked SET resumed_at = now() - make_interval(mins => 10 - right(split_part(ref, '-', 3), 1)::int) WHERE ref = ANY(${more})`;
+    asked.length = 0;
+    assert.deepEqual((await composeResumedReports(compose, 2)).composed, more.slice(0, 2));
+    assert.deepEqual(asked, more.slice(0, 2));
+    const next = await composeResumedReports(compose, 2);
+    assert.deepEqual([next.composed, next.failed.length, asked.slice(2)], [[more[2]], 1, [more[2], broken]]);
   } finally {
     await sql`DELETE FROM reports WHERE kind = 'daily' AND key = ${exists.slice(6)}`;
     await sql`DELETE FROM budget_blocked WHERE ref LIKE ${`%${T}%`}`;

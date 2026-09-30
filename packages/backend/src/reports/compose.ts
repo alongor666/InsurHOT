@@ -276,15 +276,20 @@ export async function composeMonthly(label: string, reason = "scheduled") {
 const composeByRef = (kind: "daily" | "weekly" | "monthly", key: string): Promise<Composed> =>
   kind === "daily" ? composeDaily(key, "resumed") : kind === "weekly" ? composeWeekly(key, "resumed") : composeMonthly(key, "resumed");
 
+/** How many resumed reports one catch-up run composes: each is a model call, and the run must end well within its hour. */
+const RESUMED_PER_RUN = 5;
+
 /**
  * Reports an admin resumed are composed here, whatever their age: the catch-up below only looks a few
- * days back, and a month that ran out early leaves older ones. One the limits refuse again is blocked
- * again; any other failure is left for the next run.
+ * days back, and a month that ran out early leaves older ones. A few per run, the longest-waiting
+ * first; the rest wait for the next hour. One the limits refuse again is blocked again; one that fails
+ * for another reason goes to the back of the line, so it cannot hold up the others.
  */
-export async function composeResumedReports(compose: typeof composeByRef = composeByRef): Promise<{ composed: string[]; failed: string[] }> {
+export async function composeResumedReports(compose: typeof composeByRef = composeByRef, limit = RESUMED_PER_RUN): Promise<{ composed: string[]; failed: string[] }> {
   const composed: string[] = [];
   const failed: string[] = [];
-  const rows = await sql<{ ref: string }[]>`SELECT ref FROM budget_blocked WHERE kind = 'report' AND resumed_at IS NOT NULL ORDER BY blocked_at, ref`;
+  const rows = await sql<{ ref: string }[]>`
+    SELECT ref FROM budget_blocked WHERE kind = 'report' AND resumed_at IS NOT NULL ORDER BY resumed_at, ref LIMIT ${limit}`;
   for (const { ref } of rows) {
     if (shutdownSignal.signal.aborted) break;
     const at = ref.indexOf(":");
@@ -299,6 +304,7 @@ export async function composeResumedReports(compose: typeof composeByRef = compo
       if (!(await compose(kind, key)).budgetBlocked) composed.push(ref);
     } catch (error) {
       failed.push(`${ref}: ${String(error instanceof Error ? error.message : error).slice(0, 200)}`);
+      await sql`UPDATE budget_blocked SET resumed_at = now() WHERE kind = 'report' AND ref = ${ref} AND resumed_at IS NOT NULL`;
     }
   }
   return { composed, failed };
