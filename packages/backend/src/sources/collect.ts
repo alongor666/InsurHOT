@@ -5,6 +5,7 @@ import { identityKeyFor, upsertMaterial } from "../content/materials.ts";
 import { enqueue, QUEUES } from "../jobs/queue.ts";
 import { queueProcessing } from "../jobs/content.ts";
 import { BudgetExceededError } from "../providers/receipts.ts";
+import { MoneyRefusedError } from "../providers/money.ts";
 import { fetchRss } from "./rss.ts";
 import { allowed, fetchDetail, fetchWebList, type DetailNeed } from "./web-list.ts";
 import { unsupportedConfig } from "./config-keys.ts";
@@ -163,8 +164,12 @@ export async function collectSource(sourceId: string, opts: { force?: boolean } 
         }
         // A date-only listing value gives way to the detail page's time on the same day.
         if (got.publishedAt && (!c.publishedAt || Math.abs(got.publishedAt.getTime() - c.publishedAt.getTime()) < DAY_MS)) c.publishedAt = got.publishedAt;
-      } catch {
-        // detail is best effort
+      } catch (error) {
+        // A refusal by the monetary limits (a paid detail page) ends the run as a soft failure: nothing
+        // of this round is stored, so the items come up again, with their details, once the limits allow.
+        // Stored now by their listing values alone, they would count as known and never be completed.
+        if (error instanceof MoneyRefusedError) throw error;
+        // Otherwise detail is best effort.
       }
     }
 
@@ -182,13 +187,16 @@ export async function collectSource(sourceId: string, opts: { force?: boolean } 
     return { sourceId, status: "ok", found, created, revised };
   } catch (error) {
     const message = String(error instanceof Error ? error.message : error).slice(0, 1000);
-    const budget = error instanceof BudgetExceededError;
+    // A refusal by the monetary limits is soft like a full count window (not the source's fault), but
+    // it does not pass in a quarter of an hour: the source is asked again at its own interval.
+    const money = error instanceof MoneyRefusedError;
+    const budget = money || error instanceof BudgetExceededError;
     await sql`
       UPDATE sources SET last_fetch_at = now(),
         fail_count = CASE WHEN ${budget} THEN fail_count ELSE fail_count + 1 END,
         last_error = ${message},
         health = CASE WHEN ${budget} THEN health WHEN fail_count + 1 >= 5 THEN 'failing' ELSE 'degraded' END,
-        next_fetch_at = now() + make_interval(mins => CASE WHEN ${budget} THEN 15 ELSE LEAST(interval_minutes * (fail_count + 2), 360) END),
+        next_fetch_at = now() + make_interval(mins => CASE WHEN ${money} THEN interval_minutes WHEN ${budget} THEN 15 ELSE LEAST(interval_minutes * (fail_count + 2), 360) END),
         updated_at = now()
       WHERE id = ${sourceId}`;
     await sql`UPDATE fetch_runs SET status = 'failed', finished_at = now(), found_count = ${found}, new_count = ${created}, error = ${message} WHERE id = ${run!.id}`;

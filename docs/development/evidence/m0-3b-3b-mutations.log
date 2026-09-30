@@ -1,0 +1,98 @@
+## no mutation (run twice on the same database)
+ℹ pass 8
+ℹ fail 0
+ℹ pass 8
+ℹ fail 0
+## mutation: a refused article is handled like any other failure (main's behaviour)
+✖ an article the limits refused stops as budget_blocked: no retry time, no attempt counted, and the safety net leaves it alone
+✖ an admin resumes what was stopped, a bounded number per call, newest articles first; nothing resumes by itself
+✖ the owner is told once a day that work is stopped by the limits; over the admin API it is listed and resumed
+ℹ pass 5
+ℹ fail 3
+## mutation: the safety net also queues budget_blocked articles
+✖ an article the limits refused stops as budget_blocked: no retry time, no attempt counted, and the safety net leaves it alone
+ℹ pass 7
+ℹ fail 1
+## mutation: a refused grouping job is thrown back to the queue (main's behaviour)
+✖ a grouping or digest job the limits refused ends normally and is recorded; every other failure is left to the queue
+✖ an admin resumes what was stopped, a bounded number per call, newest articles first; nothing resumes by itself
+✖ the owner is told once a day that work is stopped by the limits; over the admin API it is listed and resumed
+ℹ pass 5
+ℹ fail 3
+## mutation: a blocked report is composed again every time
+✖ a report the limits refused is recorded and not composed again until it is resumed; other failures still throw
+ℹ pass 7
+ℹ fail 1
+## mutation: the warm-up treats a refusal as any other error (main's behaviour: throws)
+✖ the embedding warm-up waits through a full count window and stops at once on a refusal by the limits
+ℹ pass 7
+ℹ fail 1
+## mutation: any refusal by the limits is asked again without the image
+✖ only an image without a verified price, or an image the model refused, is answered by asking again without it; a used-up month is not
+ℹ pass 7
+ℹ fail 1
+## mutation: a resume call is not bounded for grouping, digests and reports
+✖ an admin resumes what was stopped, a bounded number per call, newest articles first; nothing resumes by itself
+ℹ pass 7
+ℹ fail 1
+## mutation: resume takes the oldest articles first
+✖ an admin resumes what was stopped, a bounded number per call, newest articles first; nothing resumes by itself
+✖ the owner is told once a day that work is stopped by the limits; over the admin API it is listed and resumed
+ℹ pass 6
+ℹ fail 2
+## mutation: stopped work raises no alert
+✖ the owner is told once a day that work is stopped by the limits; over the admin API it is listed and resumed
+ℹ pass 7
+ℹ fail 1
+
+# ---- after review round 1 ----
+## no mutation
+ℹ pass 11
+ℹ fail 0
+## mutation: resume picks articles without re-checking their state or skipping locked rows (the round-1 code)
+✖ two resume calls at once never take the same item
+ℹ pass 10
+ℹ fail 1
+## mutation: a resumed report's row is deleted at once (the round-1 code)
+✖ an admin resumes what was stopped, a bounded number per call, newest articles first; nothing resumes by itself
+✖ a resumed report is composed by the catch-up whatever its age; refused again it is stopped again; one that exists already just loses its mark
+ℹ pass 9
+ℹ fail 2
+## mutation: a resumed report still counts as blocked
+✖ an admin resumes what was stopped, a bounded number per call, newest articles first; nothing resumes by itself
+✖ a resumed report is composed by the catch-up whatever its age; refused again it is stopped again; one that exists already just loses its mark
+ℹ pass 9
+ℹ fail 2
+## mutation: a composed report keeps its record
+✖ a resumed report is composed by the catch-up whatever its age; refused again it is stopped again; one that exists already just loses its mark
+ℹ pass 10
+ℹ fail 1
+## mutation: refused again, a resumed report stays marked resumed
+✖ a resumed report is composed by the catch-up whatever its age; refused again it is stopped again; one that exists already just loses its mark
+ℹ pass 10
+ℹ fail 1
+## mutation: the WeChat schedule ignores a refusal (the round-1 code)
+✖ a WeChat account whose check the limits refused is asked again after its interval, not at the next quarter hour
+ℹ pass 10
+ℹ fail 1
+
+# ---- after review round 2 ----
+## no mutation
+ℹ pass 11
+ℹ fail 0
+## mutation: a catch-up run composes every resumed report (the round-2 code)
+✖ a resumed report is composed by the catch-up whatever its age; refused again it is stopped again; one that exists already just loses its mark
+ℹ pass 10
+ℹ fail 1
+## mutation: a report that failed keeps its place at the front of the line
+ℹ pass 11
+ℹ fail 0
+
+# ---- after review round 2, with the assertion added for the second mutation ----
+## no mutation
+ℹ pass 11
+ℹ fail 0
+## mutation: a report that failed keeps its place at the front of the line
+✖ a resumed report is composed by the catch-up whatever its age; refused again it is stopped again; one that exists already just loses its mark
+ℹ pass 10
+ℹ fail 1

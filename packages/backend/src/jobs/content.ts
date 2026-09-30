@@ -11,6 +11,7 @@ import { isHistorical } from "../content/materials.ts";
 import { publishArticle } from "../publication/publish.ts";
 import { BudgetExceededError, ProviderRejectedError, ReceiptBusyError, ReceiptUnknownError } from "../providers/receipts.ts";
 import { ModelOutputError } from "../providers/llm.ts";
+import { refusedByMoney } from "./budget-blocked.ts";
 import { ensureQueue, enqueue, QUEUES, shutdownSignal } from "./queue.ts";
 
 /** Minutes to wait after the n-th failed attempt; one more failure after the last ends in "failed". */
@@ -126,12 +127,20 @@ export async function processArticle(articleId: string, opts: { attemptTag?: str
   }
 }
 
-/** Waits and retries for passing trouble; marks "failed" for refusals and exhausted retries. */
-async function afterFailure(articleId: string, error: unknown): Promise<{ state: string; retryAt?: Date }> {
+/**
+ * Waits and retries for passing trouble; marks "failed" for refusals and exhausted retries. A refusal
+ * by the monetary limits is neither: the article stops as "budget_blocked", without a retry time and
+ * without counting an attempt, until an admin resumes it (the safety net below leaves that state alone).
+ */
+export async function afterFailure(articleId: string, error: unknown): Promise<{ state: string; retryAt?: Date }> {
   // Let pg-boss retry this job after restart, reusing settled receipts. A deploy is not an article
   // failure and must neither consume processing_attempts nor turn an incomplete chain terminal.
   if (error instanceof AnalysisInterruptedError || shutdownSignal.signal.aborted) throw error;
   const message = String(error instanceof Error ? error.message : error).slice(0, 500);
+  if (refusedByMoney(error)) {
+    await sql`UPDATE articles SET processing_state = 'budget_blocked', processing_error = ${message}, processing_retry_at = NULL, processing_queued_at = NULL WHERE id = ${articleId}`;
+    return { state: "budget_blocked" };
+  }
   if (error instanceof ReceiptBusyError || error instanceof BudgetExceededError) {
     // Not the article's fault: the same request is in flight, or the budget window is full.
     const seconds = error instanceof BudgetExceededError ? error.retryAfterSeconds : 60;
@@ -200,7 +209,8 @@ export async function registerExtractionJobs(boss: PgBoss) {
 
 /**
  * Safety net: articles waiting for processing that no queue holds (crash between write and enqueue,
- * a lost job, a retry that came due). Articles already queued or running are left alone.
+ * a lost job, a retry that came due). Articles already queued or running are left alone, and so are
+ * the ones the monetary limits stopped ("budget_blocked" is not "new").
  */
 export async function sweepUnprocessed(): Promise<{ enqueued: number }> {
   const rows = await sql<{ id: string }[]>`

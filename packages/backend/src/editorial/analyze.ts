@@ -15,6 +15,7 @@ import { SELECTION } from "@aihot/industry/selection";
 import { sql } from "../db.ts";
 import { chatJson, MODELS, type ContentPart } from "../providers/llm.ts";
 import { completeReceipt, ProviderRejectedError } from "../providers/receipts.ts";
+import { MoneyRefusedError } from "../providers/money.ts";
 import { collapseWhitespace } from "../lib/text.ts";
 import { modelFor } from "./models.ts";
 import { buildMaterial, firstImagePart, loadAnalyzeInput, type AnalyzeInputArticle } from "./input.ts";
@@ -252,6 +253,17 @@ async function runStructure(a: AnalyzeInputArticle, opts: StepOpts): Promise<Non
   return { model: res.model, category: res.data.category, tags: normalizeTags(res.data.tags), subjects, fact: res.data.fact, receiptId: res.receiptId, reused: res.reused };
 }
 
+/**
+ * Whether a failed understanding call that carried an image is asked again with the text only: the
+ * model refused the image (download, format), or the monetary limits did, because what an image costs
+ * has no verified bound (money.ts chatWorstCase, "image_input"). Any other refusal by the limits,
+ * a used-up month included, is not a reason to ask again.
+ */
+export function writesWithoutImage(error: unknown): boolean {
+  if (error instanceof MoneyRefusedError) return error.reason === "image_input";
+  return error instanceof ProviderRejectedError && !error.retryable;
+}
+
 /** The content understanding; null when the model's content filter declines the material. */
 async function runUnderstand(a: AnalyzeInputArticle, opts: StepOpts): Promise<AnalysisRun["writing"]> {
   const model = await modelFor("understand");
@@ -271,8 +283,7 @@ async function runUnderstand(a: AnalyzeInputArticle, opts: StepOpts): Promise<An
     res = await call(image);
   } catch (error) {
     if (isContentFilter(error)) return null;
-    // The model refused the image (download, format): the text is written without it.
-    if (!image || !(error instanceof ProviderRejectedError) || error.retryable) throw error;
+    if (!image || !writesWithoutImage(error)) throw error;
     try {
       res = await call(null);
     } catch (retryError) {

@@ -9,6 +9,7 @@ import { sanitizeBody } from "../content/sanitize.ts";
 import { identityKeyForUrl } from "../lib/url.ts";
 import { mpArticle, mpHistory, type MpArticle } from "../providers/dajiala.ts";
 import { BudgetExceededError, ProviderRejectedError } from "../providers/receipts.ts";
+import { MoneyRefusedError } from "../providers/money.ts";
 
 const MAX_NEW_PER_CHECK = 8;
 /** Posts older than this on the first check of an account are history, not news. */
@@ -22,7 +23,9 @@ async function fetchBody(url: string, sourceId: string, identity: string): Promi
   try {
     return { body: await mpArticle(url, { subject: sourceId, identity }), passing: null };
   } catch (error) {
-    if (error instanceof BudgetExceededError) throw error;
+    // Neither a full count window nor a refusal by the monetary limits is a reason that passes with
+    // another look at this post: they stop the whole check instead of using up the body retries.
+    if (error instanceof BudgetExceededError || error instanceof MoneyRefusedError) throw error;
     const final = error instanceof ProviderRejectedError && !error.retryable;
     return { body: null, passing: final ? null : String(error instanceof Error ? error.message : error).slice(0, 200) };
   }
@@ -112,25 +115,35 @@ export async function checkMpAccount(sourceId: string, reason: "schedule" | "man
     return { sourceId, status: "ok" as const, found: posts.length, created, reused: history.reused };
   } catch (error) {
     const message = String(error instanceof Error ? error.message : error).slice(0, 500);
-    const soft = error instanceof BudgetExceededError || (error instanceof ProviderRejectedError && error.retryable);
+    // Refused by the monetary limits: not the account's fault (no failure counted), and not retried
+    // by the queue either, since no wait ends it. The next scheduled check asks again.
+    const money = error instanceof MoneyRefusedError;
+    const soft = money || error instanceof BudgetExceededError || (error instanceof ProviderRejectedError && error.retryable);
     await sql`
       UPDATE sources SET last_fetch_at = now(), last_error = ${message},
         fail_count = CASE WHEN ${soft} THEN fail_count ELSE fail_count + 1 END,
         health = CASE WHEN ${soft} THEN health WHEN fail_count + 1 >= 3 THEN 'failing' ELSE 'degraded' END, updated_at = now()
       WHERE id = ${sourceId}`;
     await sql`UPDATE fetch_runs SET status = 'failed', finished_at = now(), new_count = ${created}, error = ${message} WHERE id = ${run!.id}`;
-    if (soft) throw error; // retried by the queue
+    // The schedule looks again one interval after a refusal, not at its next quarter-hour run.
+    // (lastCheckedAt stays as it is: it also tells a first check from later ones.)
+    if (money) await sql`UPDATE sources SET cursor = coalesce(cursor, '{}'::jsonb) || ${sql.json({ lastRefusedAt: new Date().toISOString() })} WHERE id = ${sourceId}`;
+    if (soft && !money) throw error; // retried by the queue
     return { sourceId, status: "failed" as const, error: message };
   }
 }
 
-/** Every enabled account is checked once per its interval (the paid list call is the cost). */
+/**
+ * Every enabled account is checked once per its interval (the paid list call is the cost). A check the
+ * monetary limits refused counts for the interval too: asking again every quarter of an hour changes nothing.
+ */
 export async function scheduleMpReconcile(now = new Date()) {
-  const rows = await sql<{ id: string; last: string | null; interval_minutes: number }[]>`
-    SELECT id, cursor->>'lastCheckedAt' AS last, interval_minutes FROM sources WHERE kind = 'mp_account' AND enabled`;
+  const rows = await sql<{ id: string; last: string | null; refused: string | null; interval_minutes: number }[]>`
+    SELECT id, cursor->>'lastCheckedAt' AS last, cursor->>'lastRefusedAt' AS refused, interval_minutes FROM sources WHERE kind = 'mp_account' AND enabled`;
   let enqueued = 0;
   for (const s of rows) {
-    const since = s.last ? now.getTime() - Date.parse(s.last) : Infinity;
+    const latest = Math.max(s.last ? Date.parse(s.last) : -Infinity, s.refused ? Date.parse(s.refused) : -Infinity);
+    const since = now.getTime() - latest;
     if (since <= s.interval_minutes * 60_000) continue;
     await enqueue(QUEUES.mpCheck, { sourceId: s.id, reason: "schedule" }, { singletonKey: `mp:${s.id}` });
     enqueued += 1;

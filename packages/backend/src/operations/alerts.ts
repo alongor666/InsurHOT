@@ -71,14 +71,16 @@ export async function collectFindings(now = Date.now()): Promise<Finding[]> {
     if (Number(beijingTime(now).slice(0, 2)) >= 10) {
       const [r] = await sql`SELECT 1 FROM reports WHERE kind = 'daily' AND key = ${beijingDate(now)}`;
       if (!r) {
+        // Stopped by the monetary limits: it is not being retried, and only the owner can change that.
+        const [blocked] = await sql<{ reason: string }[]>`SELECT reason FROM budget_blocked WHERE kind = 'report' AND ref = ${`daily:${beijingDate(now)}`} AND resumed_at IS NULL`;
         out.push({
           key: "report.daily",
           level: "now",
           title: "今天的日报还没生成",
           impact: "读者看不到今天的日报",
-          heals: "系统每小时补做一次，到现在还没成功",
-          action: "转给 AI 处理",
-          detail: `reports daily ${beijingDate(now)} 不存在；看 reports.daily / reports.catch-up 的运行记录`,
+          heals: blocked ? "不会：金额限制拒绝了这次生成，系统不再自动重试" : "系统每小时补做一次，到现在还没成功",
+          action: blocked ? "需要你提高上限或批准价格，然后在后台恢复被金额限制停住的工作" : "转给 AI 处理",
+          detail: blocked ? `budget_blocked report daily:${beijingDate(now)}：${blocked.reason}` : `reports daily ${beijingDate(now)} 不存在；看 reports.daily / reports.catch-up 的运行记录`,
         });
       }
     }
@@ -102,6 +104,27 @@ export async function collectFindings(now = Date.now()): Promise<Finding[]> {
       heals: "不会自动重发",
       action: "转给 AI 处理；如果推送机器人被移出了群，需要你把它加回去",
       detail: refused!.response ?? "",
+    });
+  }
+
+  // Work the monetary limits stopped (ADR-015 section 8): it waits for the owner, nothing retries it.
+  const [stopped] = await sql<{ articles: number; other: number; since: Date | null; reason: string | null }[]>`
+    SELECT (SELECT count(*)::int FROM articles WHERE processing_state = 'budget_blocked') AS articles,
+           (SELECT count(*)::int FROM budget_blocked WHERE resumed_at IS NULL) AS other,
+           -- An article does not record when it stopped (its discovery may be days earlier): the alert then dates from when it was first seen.
+           (SELECT min(blocked_at) FROM budget_blocked WHERE resumed_at IS NULL) AS since,
+           coalesce((SELECT left(reason, 200) FROM budget_blocked WHERE resumed_at IS NULL ORDER BY blocked_at DESC LIMIT 1),
+                    (SELECT left(processing_error, 200) FROM articles WHERE processing_state = 'budget_blocked' ORDER BY discovered_at DESC LIMIT 1)) AS reason`;
+  if (stopped!.articles + stopped!.other > 0) {
+    out.push({
+      key: "money.blocked",
+      level: "today",
+      title: "有内容因为金额限制停住了",
+      impact: [stopped!.articles > 0 && `${stopped!.articles} 篇新文章没有处理`, stopped!.other > 0 && `${stopped!.other} 项归组、综述或日报没有生成`].filter(Boolean).join("，") + "，读者看不到这些内容",
+      heals: "不会，下个月也不会自动恢复",
+      action: "需要你决定是否提高上限或批准价格；之后在后台恢复这些工作",
+      detail: `最近一次被拒的原因：${stopped!.reason ?? "（无）"}；articles.processing_state = 'budget_blocked' 与 budget_blocked 表`,
+      since: stopped!.articles === 0 && stopped!.since ? stopped!.since : undefined,
     });
   }
 

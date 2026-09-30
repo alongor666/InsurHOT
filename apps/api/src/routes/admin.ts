@@ -12,6 +12,7 @@ import { runMoneyReconciliation } from "@aihot/backend/operations/money";
 import { contentChain, detachFromFact, mergeStories, overrideFields, rerun, searchContent, setSeoIndexed, setVisibility } from "@aihot/backend/admin/content";
 import { banSource, eraseFeedback, feedbackScreenshot, listFeedback, unbanSource, updateFeedback } from "@aihot/backend/admin/feedback";
 import { releaseReceipt, requeueFailedArticles, resolveDelivery, runsOverview } from "@aihot/backend/admin/runs";
+import { budgetBlockedOverview, resumeBudgetBlocked } from "@aihot/backend/admin/budget-blocked";
 import { listBudgets, listTargets, replaceContactQr, setTargetEnabled, updateBudget } from "@aihot/backend/admin/settings";
 import { createSource, fetchNow, listSources, previewSource, sourceDetail, updateSource } from "@aihot/backend/admin/sources";
 import { sql } from "@aihot/backend/db";
@@ -95,6 +96,9 @@ export function registerAdmin(app: FastifyInstance) {
   app.post("/api/admin/receipts/:id/release", adminHandler(async (req, reply, admin) => orNotFound(req, reply, await releaseReceipt(Number(param(req, "id")), body(req) as never, actorOf(admin)))));
   app.post("/api/admin/deliveries/:id/resolve", adminHandler(async (req, reply, admin) => orNotFound(req, reply, await resolveDelivery(Number(param(req, "id")), body(req) as never, actorOf(admin)))));
   app.post("/api/admin/processing/requeue", adminHandler(async (req, _reply, admin) => requeueFailedArticles(body(req) as never, actorOf(admin))));
+  // Work the monetary limits stopped (ADR-015 section 8): seen here, resumed only from here.
+  app.get("/api/admin/budget-blocked", adminHandler(async () => budgetBlockedOverview()));
+  app.post("/api/admin/budget-blocked/resume", adminHandler(async (req, _reply, admin) => resumeBudgetBlocked(body(req) as never, actorOf(admin))));
 
   // Settings
   app.get("/api/admin/settings", adminHandler(async () => ({ contact: await loadContact(), targets: await listTargets(), budgets: await listBudgets() })));

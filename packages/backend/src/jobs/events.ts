@@ -2,7 +2,7 @@
 import type { PgBoss } from "pg-boss";
 import { groupArticle } from "../events/group.ts";
 import { composeStoryDigest } from "../events/digest.ts";
-import { BudgetExceededError, ReceiptBusyError } from "../providers/receipts.ts";
+import { blockForBudget, clearBudgetBlock, refusedByMoney } from "./budget-blocked.ts";
 import { settleNonEditorial } from "./content.ts";
 import { ensureQueue, enqueue, QUEUES } from "./queue.ts";
 
@@ -18,15 +18,39 @@ export async function registerEventJobs(boss: PgBoss) {
       if (result.storyId && !result.verdict.startsWith("signal")) {
         await enqueue(QUEUES.digest, { storyId: result.storyId }, { singletonKey: `story:${result.storyId}`, startAfter: 60 });
       }
+      await clearBudgetBlock("group", job.data.articleId);
       return result;
     } catch (error) {
-      if (error instanceof BudgetExceededError || error instanceof ReceiptBusyError) throw error;
-      throw error;
+      return groupJobFailed(job.data, error);
     }
   });
   await ensureQueue(QUEUES.digest);
   await boss.work<{ storyId: number; afterCorrection?: boolean }>(QUEUES.digest, { localConcurrency: 3, pollingIntervalSeconds: 5 }, async ([job]) => {
     if (!job) return;
-    return composeStoryDigest(job.data.storyId, { afterCorrection: job.data.afterCorrection });
+    try {
+      const result = await composeStoryDigest(job.data.storyId, { afterCorrection: job.data.afterCorrection });
+      await clearBudgetBlock("digest", String(job.data.storyId));
+      return result;
+    } catch (error) {
+      return digestJobFailed(job.data, error);
+    }
   });
+}
+
+/**
+ * A grouping job that failed. A full count window or a request in flight is retried by the queue, as
+ * is any other error; a refusal by the monetary limits ends the job normally, recorded as
+ * budget-blocked, so that it does not use up the queue's retries on something waiting cannot fix.
+ */
+export async function groupJobFailed(data: { articleId: string; signalOnly?: boolean; force?: boolean }, error: unknown): Promise<{ verdict: "budget_blocked" }> {
+  if (!refusedByMoney(error)) throw error;
+  await blockForBudget("group", data.articleId, error, data);
+  return { verdict: "budget_blocked" };
+}
+
+/** A digest job that failed: as for grouping. */
+export async function digestJobFailed(data: { storyId: number; afterCorrection?: boolean }, error: unknown): Promise<{ updated: false; budgetBlocked: true }> {
+  if (!refusedByMoney(error)) throw error;
+  await blockForBudget("digest", String(data.storyId), error, data);
+  return { updated: false, budgetBlocked: true };
 }
