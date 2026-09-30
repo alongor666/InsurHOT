@@ -1,6 +1,6 @@
 # M0.2 应用整合预检
 
-2026-09-30；预检已落实，489文件已整合，待独立评审；[执行证据](m0-integration-evidence.md)。上游固定SHA与ADR-001相同，不采用较新的上游HEAD。
+2026-09-30；预检已落实，489文件已整合并经独立评审合入 main（PR #6，merge `c85db795`）；[执行证据](m0-integration-evidence.md)。上游固定SHA与ADR-001相同，不采用较新的上游HEAD。
 
 ## 路径映射
 

@@ -14,13 +14,13 @@
   - web 路由 6 个：`ls apps/web/app/routes | grep -c leaderboard`
   - `apps/web/app/features/leaderboard/`
   - `packages/backend/src/leaderboard/`，其中 `fetch/sources/` 10 个来源文件：`ls packages/backend/src/leaderboard/fetch/sources | wc -l`
-  - `packages/contracts/src` 3 处、API 路由 3 处、worker 调度 2 处（`grep -rli leaderboard <dir>`）
+  - `packages/contracts/src` 3 处、`apps/api/src/routes` 3 处（加 `app.ts` 注册共 4）、worker 调度 2 处（`grep -rli leaderboard <dir>`）
   - 脚本 4 个：`lb-fetch-check.ts`、`lb-round.ts`、`import-leaderboard-prices.ts`、`eval-selection.ts`（后者部分）
   - seeds 2 个：`database/seeds/lb-models-*.json`、`lb-official-prices-*.json`
   - `assets/leaderboard-sources/`、`tests/leaderboard-worker.test.ts`
 - monitor
   - `packages/backend/src/monitor/`、`apps/web/app/features/monitor/`、`codex-reset.tsx` 路由及 nav/more/agent/admin 布局引用、API 路由 3 处、worker 2 处、`tests/monitor.test.ts`、SocialData provider
-- X 采集：32 个文件引用（`grep -rlE "x_search|x-article|socialdata" apps packages industry database scripts tests | grep -vE "/build/|\.react-router" | wc -l`）；`tests/x-article.test.ts`、`tests/x-shards.test.ts`
+- X 采集：32 个文件引用采集/provider 标识（`grep -rlE "x_search|x-article|socialdata" apps packages industry database scripts tests | grep -vE "/build/|\.react-router" | wc -l`）；连同 `x_post`/`x_article` 列的消费方共 43 个（把 `x_post|x_article` 加进同一正则）；`tests/x-article.test.ts`、`tests/x-shards.test.ts`
 - 引文翻译：5 个文件（`grep -rlE "quote_translation|translateQuote" apps packages database tests | wc -l`）
 - `FEATURES` 消费方 15 处（`grep -rl "FEATURES\." apps packages industry scripts | grep -v "/build/\|\.react-router"`）：nav、agent、more、admin 布局、og/site/v1/static 路由、worker 调度与入口、sitemap、llms.txt、smoke、seed
 
@@ -37,7 +37,7 @@
 | 0011 | 唯一索引 `lb_aliases_source_alias_key` | 随表删 |
 | 0037 | 列 `articles.x_article` | 删列 |
 | 0038 | `quote_translations` | 删 |
-| 0001 | `sources.kind` CHECK 含 `'x_search'`；列 `articles.x_post`（`publication/feeds.ts`、`publication/items.ts` 等 `channel='x'` 发布路径引用） | 新迁移收窄 CHECK；`x_post` 列与 `channel='x'` 路径一并移除，消费方逐处清理 |
+| 0001 | `sources.kind` CHECK 含 `'x_search'`；列 `articles.x_post`（`publication/feeds.ts`、`publication/items.ts`、`editorial/input.ts`、`translate.ts`、`publication/publish.ts`、`detail.ts` 等 `channel='x'` 发布路径引用）；`publications.channel CHECK (channel IN ('news','x'))`（`0001_core.sql:227`） | 新迁移收窄 `sources.kind` CHECK、收窄 `publications.channel` 为 `('news')`；`x_post` 列与 `channel='x'` 路径一并移除，消费方逐处清理 |
 | 0022 | 预置 `socialdata` 预算行 | 新迁移删除该行 |
 
 ## 决定（建议）
