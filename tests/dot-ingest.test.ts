@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
 import Fastify from 'fastify';
 import { DOT_BODY_LIMIT, type DotDelivery } from '../packages/contracts/src/dot-ingest.ts';
 import { DotIntakeError, DotIntakeService, dotPayloadHash, type DotRepository, type DotStoredReceipt } from '../packages/backend/src/ingest/dot.ts';
-import { registerDotIngest } from '../apps/api/src/routes/dot-ingest.ts';
-const token = '98d74ec65c70901b437a68d055a318ff9a81d061';
+import { DOT_RATE_LIMIT, registerDotIngest } from '../apps/api/src/routes/dot-ingest.ts';
+// Generated per run so no token-shaped literal is committed; only its shape matters to the route.
+const token = randomBytes(20).toString('hex');
 const time = '2026-09-30T09:00:00.000Z';
 function payload(): DotDelivery {
   return { schemaVersion: 'insurhot.dot.v1', deliveryId: 'delivery-1', items: [{ itemId: 'item-1', title: 'Insurance change',
@@ -48,6 +50,18 @@ test('dedicated valid token required before storage; old ingest token cannot aut
   }
   const { repo, app, post } = setup();
   try { for (const auth of ['', 'Bearer wrong', 'Basic abc']) assert.equal((await post(payload(), auth)).statusCode, 401); assert.equal(repo.calls, 0); } finally { await app.close(); }
+});
+test('per-address rate limit counts before authentication and does not affect other addresses', async () => {
+  const { repo, app } = setup();
+  const post = (remoteAddress: string, auth = 'Bearer wrong') => app.inject({ method: 'POST', url: '/api/ingest/dot', payload: payload(), headers: { authorization: auth }, remoteAddress });
+  try {
+    for (let n = 0; n < DOT_RATE_LIMIT.perWindow; n++) assert.equal((await post('10.0.0.1')).statusCode, 401);
+    const limited = await post('10.0.0.1', `Bearer ${token}`);
+    assert.equal(limited.statusCode, 429); assert.deepEqual(limited.json(), { ok: false, error: 'rate_limited' });
+    assert.equal(limited.headers['retry-after'], '60'); assert.equal(limited.headers['cache-control'], 'no-store');
+    assert.equal((await post('10.0.0.2', `Bearer ${token}`)).statusCode, 200);
+    assert.equal(repo.calls, 1);
+  } finally { await app.close(); }
 });
 test('receipt and isolated payload preserve server observation, source and Dot times; HTML remains data', async () => {
   const { repo, app, post } = setup();

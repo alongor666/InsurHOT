@@ -12,8 +12,22 @@ function authorized(header: string | undefined, expected: string | undefined): b
   const digest = (value: string) => createHash('sha256').update(value).digest();
   return timingSafeEqual(digest(given), digest(expected));
 }
+// Per client address, counted before authentication so token guessing and bulk retries are both bounded.
+// Same in-memory shape as the admin login limiter; state lives with the app instance, so a restart only relaxes it.
+export const DOT_RATE_LIMIT = { perWindow: 60, windowMs: 60_000 };
+function rateLimiter() {
+  const recent = new Map<string, number[]>();
+  return (address: string, now = Date.now()): boolean => {
+    const list = (recent.get(address) ?? []).filter((t) => now - t < DOT_RATE_LIMIT.windowMs);
+    list.push(now);
+    recent.set(address, list);
+    if (recent.size > 5000) for (const [k, v] of recent) if (v.every((t) => now - t >= DOT_RATE_LIMIT.windowMs)) recent.delete(k);
+    return list.length > DOT_RATE_LIMIT.perWindow;
+  };
+}
 export function registerDotIngest(app: FastifyInstance, options: DotRouteOptions = {}) {
   const env = options.env ?? (() => process.env);
+  const rateLimited = rateLimiter();
   let service = options.service;
   app.post('/api/ingest/dot', {
     bodyLimit: DOT_BODY_LIMIT,
@@ -21,6 +35,7 @@ export function registerDotIngest(app: FastifyInstance, options: DotRouteOptions
       reply.header('Cache-Control', 'no-store');
       const settings = env();
       if (settings.DOT_INGEST_ENABLED !== 'true') return reply.code(503).send({ ok: false, error: 'dot_ingest_disabled' });
+      if (rateLimited(String(req.ip))) return reply.header('Retry-After', String(DOT_RATE_LIMIT.windowMs / 1000)).code(429).send({ ok: false, error: 'rate_limited' });
       if (!authorized(req.headers.authorization, settings.DOT_INGEST_TOKEN)) return reply.code(401).send({ ok: false, error: 'unauthorized' });
     },
     // Parser errors are stable, private, and never log received text or credentials.
