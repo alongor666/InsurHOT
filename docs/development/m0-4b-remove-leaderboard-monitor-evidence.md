@@ -23,7 +23,7 @@ ADR-002 第 2 步拆成两个 PR：本 PR 删 leaderboard、monitor 与只有模
 
 - drop `lb_models`、`lb_aliases`、`lb_snapshots`、`lb_scores`、`lb_runs`、`lb_rankings`、`lb_prices`、`monitor_posts`、`monitor_events`、`monitor_event_posts`、`monitor_state`、`fx_rates`（12 张表，索引随表删除）。
 - 删除 `settings` 里两模块的 3 个键：`leaderboard.fetch`、`leaderboard.last_check`、`models.monitor`。
-- 从 `alerts.state` 里去掉两模块的三个告警键（`monitor.stuck`、`monitor.review`、`leaderboard.fetch`）：否则一条还开着的旧告警会在下次检查时发一条「已恢复」（第一轮评审实测）。其他告警键不动。
+- 从 `alerts.state` 里去掉两模块的告警键：真正会误发「已恢复」的是 `monitor.stuck`、`monitor.review`（today 级，第一轮评审实测）；`leaderboard.fetch` 是 digest 级，本来进不了 `alerts.state`，一并清掉只为保险。其他告警键不动；该值不是对象时（只有手工改库才会出现）这一句不执行，迁移照常通过。
 - **保留** `notify_targets`、`deliveries`、`delivery_leases`（与前述表同在迁移 0003，属通用推送）。
 - 没有改写任何历史迁移文件。
 
@@ -56,7 +56,7 @@ ADR-002 第 2 步拆成两个 PR：本 PR 删 leaderboard、monitor 与只有模
 
 用例数的变化：第 1 步是 155 个、29 个文件；删掉 `leaderboard-worker.test.ts`（2 个）与 `monitor.test.ts`（2 个），`features-off.test.ts`（4 个）改写为 `removed-modules.test.ts`（4 个），所以是 151 个、27 个文件。
 
-**迁移作用在旧库上**：先建一个停在 0041 的库，向 `lb_models`、`lb_aliases`（带外键）、`monitor_state`、`settings`（3 个待删键 + 1 个 `models.score`，以及一条含 `monitor.stuck`、`leaderboard.fetch`、`backup.stale` 三个开着的告警的 `alerts.state`）、`notify_targets` 各写一行，再跑迁移。结果：12 张表全部消失；三张推送表仍在，`notify_targets` 的行还在；`settings` 只剩 `models.score`；`alerts.state` 只剩 `backup.stale`；再跑一次迁移报告 up to date。
+**迁移作用在旧库上**：先建一个停在 0041 的库，向 `lb_models`、`lb_aliases`（带外键）、`monitor_state`、`settings`（3 个待删键 + 1 个 `models.score`，以及一条含 `monitor.stuck`、`leaderboard.fetch`、`backup.stale` 三个开着的告警的 `alerts.state`）、`notify_targets` 各写一行，再跑迁移。结果：12 张表全部消失；三张推送表仍在，`notify_targets` 的行还在；`settings` 只剩 `models.score`；`alerts.state` 只剩 `backup.stale`（对照用的键；它也是 digest 级，真实运行中不会出现在这里）；再跑一次迁移报告 up to date。
 
 **站点**：`/leaderboard`、`/leaderboard/rules`、`/leaderboard/sources`、`/leaderboard/category/coding`、`/leaderboard/methodology`、`/codex-reset`、`/codex-reset/`、`/admin/monitor`、`/api/v1/codex-resets`、`/api/admin/monitor/events`、`/model-providers/openai.svg`、`/og/pages/leaderboard.png` 全部 404；`/`、`/all`、`/more`、`/agent`、`/admin/login` 为 200；首页、`/more`、`/agent` 的 HTML 里没有指向两模块的链接。
 
@@ -66,7 +66,7 @@ ADR-002 第 2 步拆成两个 PR：本 PR 删 leaderboard、monitor 与只有模
 
 残留搜索：`grep -rn -i "leaderboard\|codex\|lb_\|model-providers\|模型榜\|重置" apps packages scripts industry tests reference .env.example`（排除构建产物）只剩：新测试自身、`/agent` 页里 `codex mcp add` 的接入示例、`industry/taxonomy.ts` 与 `industry/prompts/rules-domain.md` 里把 Codex 当作 OpenAI 产品名的分类词（属行业内容，随内容替换处理，不在 ADR-002 内）。
 
-第一轮独立评审（绑定 `877cbce`，APPROVE，4 项 P3）已在本版处理：告警文案里残留的「重置通知」改掉（原残留搜索只搜了「重置监控」，漏了它）；迁移清理 `alerts.state`；`removed-modules.test.ts` 第 3 项补上 SocialData 凭据，使被接回的监控调度会被查出；`NOTICE` 一项登记到 #12。另删了已无调用方的 `IconChart`。
+第一轮独立评审（绑定 `877cbce`，APPROVE，4 项 P3）已在本版处理：告警文案里残留的「重置通知」改掉（原残留搜索只搜了「重置监控」，漏了它）；迁移清理 `alerts.state`；`removed-modules.test.ts` 第 3 项补上 SocialData 凭据，使被接回的监控调度会被查出；`NOTICE` 一项登记到 #12。另删了已无调用方的 `IconChart`。第二轮（绑定 `d349540`，APPROVE，2 项 P3）：迁移里清理 `alerts.state` 的语句加上「值是对象」的条件；上文对 `leaderboard.fetch` 与 `backup.stale` 级别的表述已更正。
 
 ## 未运行
 
