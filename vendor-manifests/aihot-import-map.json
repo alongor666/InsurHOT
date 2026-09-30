@@ -1,6 +1,6 @@
 {
   "commit": "589f79eff09470b31ba8a7f1d9eb62d36ff2be6c",
-  "status": "integrated-pending-review",
+  "status": "integrated",
   "entries": [
     {
       "source": ".claude/launch.json",
