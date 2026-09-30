@@ -14,6 +14,11 @@ process.env.SESSION_SECRET ??= "test-session-secret-0123456789";
 process.env.IMG_PROXY_SIGN_SECRET ??= "test-img-secret-0123456789";
 process.env.FEISHU_CONTENT_PUSH_ENABLED = "false";
 process.env.INDEXNOW_SUBMIT_ENABLED = "false";
+// Collection is opted in for this test process only: every fetch target the tests use is a stub on
+// 127.0.0.1 started by the test itself, so the collection gate (M0.3a) sees an explicit, local-only
+// "true". Paid providers (LLM, embeddings, SocialData, Jina, Dajiala) stay behind the unconditional
+// paid lock until M0.3b; the test files that need them are listed in tests/paid-lock-blocked.txt.
+process.env.COLLECT_ENABLED = "true";
 process.env.LOG_LEVEL ??= "error";
 // The tests were written against the named model presets AIHOT assigns to each step (each provider is
 // pointed at a local stub by the test that needs it). The open-source default is one model for every
