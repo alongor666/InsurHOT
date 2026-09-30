@@ -1,0 +1,16 @@
+# Backend test files that cannot pass until M0.3b: every path they exercise goes through paidRequest()
+# (LLM, embeddings, SocialData, Jina, Dajiala), which M0.3a locks unconditionally — no environment
+# switch may open it (AGENTS.md: paid calls stay off; tests use local stubs, and these stubs are never
+# reached). scripts/test-unlocked.sh excludes them; they stay in the repository as the upstream
+# behaviour record and come back file by file as M0.3b lands. Refs #10, #11, docs/development/m0-pg-verification.md.
+# Format: one path per line; text after '#' is the reason.
+tests/analyze.test.ts            # 6/6 model calls (paid lock)
+tests/analyze-shutdown.test.ts   # 3/3 wait for a model stub that the paid lock never lets through (120s timeouts)
+tests/default-model.test.ts      # 1/1 model calls
+tests/events.test.ts             # 10/10 model calls (grouping/report decisions)
+tests/receipts.test.ts           # 3/3 receipt budgets around paid calls
+tests/signals.test.ts            # 3/3 model calls
+tests/translate.test.ts          # 3/3 model calls
+tests/translate-shutdown.test.ts # 2/2 model calls
+tests/x-article.test.ts          # 2/2 SocialData (paid)
+tests/x-shards.test.ts           # 3/3 SocialData (paid)

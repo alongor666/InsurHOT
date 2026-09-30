@@ -1,0 +1,6 @@
+# Individual cases inside otherwise passing files that need a paid provider (SocialData, Dajiala, Jina).
+# scripts/test-unlocked.sh passes them to node --test-skip-pattern; the rest of each file still runs.
+# Refs #10, #11.
+an X search longer than one run is read to the old watermark over the next runs
+a WeChat body that failed for a passing reason is fetched on the next check and analysed again
+a Jina listing is read on every fetch, and buys a detail rendering only where a regex rule needs it

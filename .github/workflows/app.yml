@@ -53,8 +53,8 @@ jobs:
         run: |
           node scripts/migrate.ts
           node scripts/seed.ts --topics-only
-      - name: Backend tests
-        run: npm test
+      - name: Backend tests (paid-lock-blocked files and cases excluded, see tests/paid-lock-blocked*.txt)
+        run: bash scripts/test-unlocked.sh
       - name: Dependency audit (report only until M0.5 decides the threshold)
         continue-on-error: true
         run: npm audit --audit-level=high
