@@ -1,0 +1,991 @@
+
+> test
+> node --test --test-concurrency=1 --test-timeout=120000 "tests/*.test.ts"
+
+{"level":"warn","msg":"alert (not sent: FEISHU_INTERNAL_ENABLED is off)","title":"🔴 新内容卡住了，进不了网站（已持续 3 小时）","lines":["影响：10 篇新文章等了 2 小时以上还没处理完，精选和热点会缺内容","会自己好吗：服务恢复后会自动补处理","你需要：转给 AI 处理","给 AI 的细节：没有记录错误"]}
+{"level":"warn","msg":"alert (not sent: FEISHU_INTERNAL_ENABLED is off)","title":"🔴 今天的日报还没生成","lines":["影响：读者看不到今天的日报","会自己好吗：系统每小时补做一次，到现在还没成功","你需要：转给 AI 处理","给 AI 的细节：reports daily 2026-09-30 不存在；看 reports.daily / reports.catch-up 的运行记录"]}
+{"level":"warn","msg":"alert (not sent: FEISHU_INTERNAL_ENABLED is off)","title":"🔴 仍未恢复：新内容卡住了，进不了网站（已持续 4 小时 1 分钟）","lines":["影响：10 篇新文章等了 2 小时以上还没处理完，精选和热点会缺内容","会自己好吗：服务恢复后会自动补处理","你需要：转给 AI 处理","给 AI 的细节：没有记录错误"]}
+{"level":"warn","msg":"alert (not sent: FEISHU_INTERNAL_ENABLED is off)","title":"🔴 仍未恢复：今天的日报还没生成（已持续 1 小时 1 分钟）","lines":["影响：读者看不到今天的日报","会自己好吗：系统每小时补做一次，到现在还没成功","你需要：转给 AI 处理","给 AI 的细节：reports daily 2026-09-30 不存在；看 reports.daily / reports.catch-up 的运行记录"]}
+{"level":"warn","msg":"alert (not sent: FEISHU_INTERNAL_ENABLED is off)","title":"✅ 已恢复：新内容卡住了，进不了网站","lines":["持续 4 小时 10 分钟（9月30日 13:07 起）"]}
+✔ an outage is announced once, repeated hourly, and closed with one recovery (91.594375ms)
+✖ SIGTERM during the final paid writing call still commits the complete analysis and publication (120009.650084ms)
+✖ SIGTERM during successful first score drains slower structure and leaves a retryable job (120000.647125ms)
+✖ SIGTERM during failed first score drains slower structure and leaves a retryable job (120000.129875ms)
+✔ every prompt in the pack renders, and the site's name replaces AIHOT's (56.633792ms)
+✖ a selected item: prefilter, two scores, the content understanding and the structure (160.5215ms)
+✖ a near-selected item is written like a selected one; below the floor it is translated (4.376708ms)
+✖ the prefilter's BLOCK stops everything; UNKNOWN goes on like PASS (22.938625ms)
+✖ a feed summary alone: the article page is fetched first, then the whole article is judged (165.143333ms)
+✖ a short post in Chinese is its own copy; a content-filter refusal is translated instead (5.373792ms)
+✔ guards: a company the input does not name is not written in; long summaries are cut at sentences (5.845292ms)
+✖ analysing the same revision again reuses every paid answer (26.178625ms)
+✖ an X search longer than one run is read to the old watermark over the next runs (18.639125ms)
+✖ a WeChat body that failed for a passing reason is fetched on the next check and analysed again (2.59325ms)
+✖ one model runs the prefilter, both scores, the writing and the structure (23.981625ms)
+✔ fact recall keeps stored vector precision and invalidates changed fact or story text (15.09225ms)
+✔ a same-text stored-vector repair is picked up after bounded cache expiry (1.721875ms)
+✔ fact cache evicts beyond its bounded window (113.174792ms)
+✖ a detach made while the model is deciding the report's fact stands (58.564917ms)
+✖ a report joins the fact the model names, and a revision keeps that membership without asking again (9.475333ms)
+✖ an explicit regroup drops the automatic membership and decides again (7.974333ms)
+✖ a report waiting for a regroup is not evidence for others, and its own turn decides it again (19.304292ms)
+✖ a development attaches to the story's earliest fact that still holds reports (8.759792ms)
+✖ a story's root is the fact reported first, not the one with the lowest number (9.945042ms)
+✖ two stories a report ties together merge when both models see one story in their roots (10.313625ms)
+✖ two stories stay apart when their roots are different events, whatever the report ties them with (9.896042ms)
+✖ a story whose reports all moved away keeps its address: it redirects to where the last one went (10.345958ms)
+✖ stories that reports keep tying together without merging list each other as related (8.894042ms)
+(node:4951) [FSTDEP023] FastifyDeprecation: disableRequestLogging option is deprecated. Use the logController option with disableRequestLogging or isLogDisabled override instead. The disableRequestLogging top-level option will be removed in `fastify@6`.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a 5 MiB multipart screenshot waits intact for forwarding (37.971542ms)
+✔ malformed multipart and screenshots above the existing backend limit are rejected (9.798875ms)
+✔ the JSON screenshot sent by an already-open tab remains accepted (5.783792ms)
+✔ a failed screenshot upload keeps the feedback waiting, and the sweep sends it with the image (20.357125ms)
+✔ a send that fails after the upload goes out with the same image next time (3.244667ms)
+✔ a screenshot that cannot be uploaded for a day is dropped, and the text still goes (2.2525ms)
+✔ imported feedback that was never forwarded is not sent now (0.596208ms)
+✔ faces are 精选组 sources by tier (T1, T1.5, T2), at most 6; 氛围组 only counts in +N (83.474708ms)
+✔ touch icons and large icons come before small ones and favicon.ico (1.599167ms)
+✔ favicon.ico: the largest entry, PNG or 32-bit bitmap (2.586083ms)
+✔ threaded v15 preserves complete board output and lets the parent event loop run (93.737292ms)
+✔ worker computation errors reject the round (23.867125ms)
+✖ an article a feed lists twice is stored once and stays put across fetches (39.741625ms)
+✖ sections of one page are separate articles when the source keeps fragments (4.247334ms)
+✖ a feed that garbles different characters on every load keeps one version (22.911291ms)
+✖ a changelog's date headings date its updates and are no articles themselves (4.906625ms)
+✔ concurrent changes to one article each get a revision (71.073709ms)
+✔ an unchanged report does not add a revision (5.416209ms)
+✔ an imported article's first report records a baseline, not a revision (7.893625ms)
+✔ simultaneous first reports of one URL create one article (8.57675ms)
+✔ another source listing the same article records a discovery, not a revision (27.940083ms)
+✔ another source reporting an imported article first does not set its baseline (7.953042ms)
+✔ a return to an earlier version is not a revision (19.240291ms)
+✔ an imported article that returns to its baseline is not revised again (12.074292ms)
+✔ characters lost in transit are no revision, lost or restored (59.827167ms)
+✔ closing the API drains a live MCP subscription before closing HTTP (62.229583ms)
+✖ one timeout covers the complete redirect chain (3.051083ms)
+✖ simultaneous modes share original bytes, preserve dimensions and use their disk caches (6.765584ms)
+✖ failed originals are not retried for every mode (6.119208ms)
+✔ site media exposes responsive previews and full lightboxes while RSS retains thumb images (1.001458ms)
+✔ concurrent cold OG and poster requests all succeed with identical cached bytes (386.089541ms)
+✖ successive responsive candidates reuse the completed original download (0.345833ms)
+✖ the original cache expires and evicts old entries instead of retaining every source (0.529541ms)
+✔ modern raster output preserves transparency and never flattens animation (3.684708ms)
+✔ small SVG stays vector while a large vector receives the requested browser rendition (16.101917ms)
+✔ responsive URLs and web body candidates retain exact signatures and stable expiry (1.319291ms)
+✖ image HTTP responses keep issued URLs valid, reject tampering before fetching and do not vary on Accept (40.623208ms)
+✖ background preparation turns a cached GIF into a smaller animated WebP with every frame and its timing (0.385333ms)
+✔ preparation finds every rendition a card and a page ask for, including escaped body images (83.397542ms)
+✔ a confirmation of two resets nobody announced records two confirmed resets, once (21.936208ms)
+✔ plural wording without a stated number stays one reset (3.169708ms)
+✔ runtime opt-in and actual HTTP boundaries deny defaults, invalid values and revoked flags (21.739291ms)
+✔ all paid requests reject before DB or callback even with opt-in flags (0.484417ms)
+✔ receipt count-budget check rejects missing row before querying counts (0.114375ms)
+✔ direct integrations reject redirects even when caller requests follow and opt-in is revoked (4.433291ms)
+(node:5478) [FSTDEP023] FastifyDeprecation: disableRequestLogging option is deprecated. Use the logController option with disableRequestLogging or isLogDisabled override instead. The disableRequestLogging top-level option will be removed in `fastify@6`.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ site reading sends one language while exports retain both, including after withdrawal (74.854417ms)
+✔ revoking a source's licence takes its articles off every exit (72.427041ms)
+✔ a withdrawn item leaves every report exit (14.870375ms)
+✔ a withdrawal takes down only the stories citing it, including secondary memberships (29.172042ms)
+✔ a withdrawn item leaves the hot board and the hot APIs at once, not at the next ranking (27.235042ms)
+✔ item pages follow the live rule: unsummarised editorial items keep one, hot_signal items have none (14.585208ms)
+✔ an early release keeps the selected ledger in order (15.020458ms)
+✔ a withdrawal waiting behind an unreleased item leaves new snapshots at once, and changes still carry both (13.724209ms)
+✔ snapshots answer 304 to their own ETag (1.074375ms)
+✔ v1 story retains website content and fallback ordering without the website-only heat reads (11.09175ms)
+✔ unchanged republishing preserves freshness, while URL-only changes still reach the projection and ledger (6.159125ms)
+✔ share images keep detail metadata and access rules while conditional reads avoid body hydration (5.2095ms)
+✔ minimal sync projection preserves snapshot fields, pagination bindings and ordered changes (14.477542ms)
+✔ the migrations seed a budget for every paid service (8.785333ms)
+✖ an answer already received is reused instead of bought again (0.365167ms)
+✖ retries of unusable answers stop at the budget, and every request sent is counted (3.873875ms)
+✔ with the valve off nothing is sent (0.259291ms)
+✖ an unknown outcome is released automatically once, so a lost answer costs at most one repeat (1.600791ms)
+✔ an editors' lead is matched to the item it is written about (0.901875ms)
+✔ a lead that matches no item clearly has no item (0.078167ms)
+✔ without an editors' lead the first highlight leads (0.047333ms)
+✖ RSS first backfill, ordinary window, 304, revision and config edits preserve collection behavior (15.511917ms)
+✖ Last-Modified works without ETag and changing redirect targets cannot accept an unrelated 304 (2.265167ms)
+✖ a discussion post that came before any report is grouped again when a report founds its fact (64.462417ms)
+✖ history waits behind live work and founds no event; a new source's post from today is news (22.738833ms)
+✖ a discussion post that quotes a post not yet collected joins its story when the original arrives (10.676584ms)
+✔ a config entry the collector does not implement fails the fetch instead of being ignored (27.421875ms)
+✖ feed entries outside the source's URL rules are skipped (2.82675ms)
+✖ detail rules fill what the listing lacks, and a detail title survives the next listing (1.955709ms)
+✖ a Jina listing is read on every fetch, and buys a detail rendering only where a regex rule needs it (1.29175ms)
+✖ detail HTML supplies the ordinary extracted body once, while short pages keep extraction pending (0.556875ms)
+✔ Jina card links become posts with their own titles (1.918125ms)
+✔ anchors into the listing page itself are navigation, not posts (2.896541ms)
+✔ promotions a feed rotates inside its posts are left out of the body (2.656625ms)
+✖ the MiMo homepage lists its posts and model pages, not its menu (0.311916ms)
+✖ a MiMo homepage without the list fails the fetch instead of listing its menu (0.798459ms)
+✔ config entries a source kind does not implement are named, not ignored (0.105208ms)
+✔ a listing that links other articles in its teasers takes only the links that begin a line (0.28ms)
+✖ feed text that only teases the article is a summary: the page is fetched before judging (0.253791ms)
+✔ hidden page parts are dropped whole, and a news page's closing blocks are trimmed (2.546667ms)
+✔ noise words match whatever their case (0.136541ms)
+✖ dates in yyyymmdd and in JSON-LD are read (0.177791ms)
+✖ SIGTERM finishes the sent normal batch and resumes from its receipt (293.387292ms)
+✖ SIGTERM finishes the sent misaligned batch and resumes from its receipt (257.789458ms)
+(node:5829) [FSTDEP023] FastifyDeprecation: disableRequestLogging option is deprecated. Use the logController option with disableRequestLogging or isLogDisabled override instead. The disableRequestLogging top-level option will be removed in `fastify@6`.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ a text corrected while its translation was running is translated again, and the old translation is not shown (40.986459ms)
+✖ links and images inside a paragraph survive the translation, or the paragraph stays in the original (11.342875ms)
+✖ the post a selected X post quotes is translated once and shown with the item (14.113583ms)
+✔ internal and reserved addresses are blocked in every spelling (1.49875ms)
+✔ URL literals that embed a loopback address are refused before any request (1.828917ms)
+✔ a name resolving to an internal address is refused at connect time (4.092667ms)
+✔ through the egress proxy only internal answers refuse a name; literals keep the full check (0.258666ms)
+✖ a post that links an X Article waits for extraction, which brings the article in as a new revision (23.51075ms)
+✖ an article that cannot be fetched is flagged to the model, not passed off as a complete body (2.269458ms)
+✔ shards keep to the query length and account limits, per participation mode (15.822791ms)
+✖ one search reads a shard; each account gets its own posts, run and watermark (8.057125ms)
+✖ a page failing after the first keeps what was read and goes on from there next run (5.323208ms)
+✖ a quiet account's old newest post does not drag the shard's search back: its last check does (3.247708ms)
+✔ a failed search fails every account of the shard and moves no watermark (4.04325ms)
+✔ due accounts are scheduled by shard, not one by one (36.310125ms)
+ℹ tests 132
+ℹ suites 0
+ℹ pass 73
+ℹ fail 56
+ℹ cancelled 3
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 372797.766875
+
+✖ failing tests:
+
+test at tests/analyze-shutdown.test.ts:97:1
+✖ SIGTERM during the final paid writing call still commits the complete analysis and publication (120009.650084ms)
+  'test timed out after 120000ms'
+
+test at tests/analyze-shutdown.test.ts:120:40
+✖ SIGTERM during successful first score drains slower structure and leaves a retryable job (120000.647125ms)
+  'test timed out after 120000ms'
+
+test at tests/analyze-shutdown.test.ts:120:40
+✖ SIGTERM during failed first score drains slower structure and leaves a retryable job (120000.129875ms)
+  'test timed out after 120000ms'
+
+test at tests/analyze.test.ts:94:1
+✖ a selected item: prefilter, two scores, the content understanding and the structure (160.5215ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at runPrefilter (file://<repo>/packages/backend/src/editorial/analyze.ts:197:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async runAnalysis (file://<repo>/packages/backend/src/editorial/analyze.ts:341:21)
+      at async analyzeArticle (file://<repo>/packages/backend/src/editorial/analyze.ts:424:15)
+      at async TestContext.<anonymous> (file://<repo>/tests/analyze.test.ts:97:15)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/analyze.test.ts:115:1
+✖ a near-selected item is written like a selected one; below the floor it is translated (4.376708ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at runPrefilter (file://<repo>/packages/backend/src/editorial/analyze.ts:197:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async runAnalysis (file://<repo>/packages/backend/src/editorial/analyze.ts:341:21)
+      at async analyzeArticle (file://<repo>/packages/backend/src/editorial/analyze.ts:424:15)
+      at async TestContext.<anonymous> (file://<repo>/tests/analyze.test.ts:116:16)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/analyze.test.ts:128:1
+✖ the prefilter's BLOCK stops everything; UNKNOWN goes on like PASS (22.938625ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at runPrefilter (file://<repo>/packages/backend/src/editorial/analyze.ts:197:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async runAnalysis (file://<repo>/packages/backend/src/editorial/analyze.ts:341:21)
+      at async analyzeArticle (file://<repo>/packages/backend/src/editorial/analyze.ts:424:15)
+      at async TestContext.<anonymous> (file://<repo>/tests/analyze.test.ts:129:15)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/analyze.test.ts:144:1
+✖ a feed summary alone: the article page is fetched first, then the whole article is judged (165.143333ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at runPrefilter (file://<repo>/packages/backend/src/editorial/analyze.ts:197:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async runAnalysis (file://<repo>/packages/backend/src/editorial/analyze.ts:341:21)
+      at async analyzeArticle (file://<repo>/packages/backend/src/editorial/analyze.ts:424:15)
+      at async TestContext.<anonymous> (file://<repo>/tests/analyze.test.ts:157:18)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/analyze.test.ts:161:1
+✖ a short post in Chinese is its own copy; a content-filter refusal is translated instead (5.373792ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at runPrefilter (file://<repo>/packages/backend/src/editorial/analyze.ts:197:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async runAnalysis (file://<repo>/packages/backend/src/editorial/analyze.ts:341:21)
+      at async analyzeArticle (file://<repo>/packages/backend/src/editorial/analyze.ts:424:15)
+      at async TestContext.<anonymous> (file://<repo>/tests/analyze.test.ts:168:16)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/analyze.test.ts:189:1
+✖ analysing the same revision again reuses every paid answer (26.178625ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at runPrefilter (file://<repo>/packages/backend/src/editorial/analyze.ts:197:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async runAnalysis (file://<repo>/packages/backend/src/editorial/analyze.ts:341:21)
+      at async analyzeArticle (file://<repo>/packages/backend/src/editorial/analyze.ts:424:15)
+      at async TestContext.<anonymous> (file://<repo>/tests/analyze.test.ts:192:17)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/collection.test.ts:69:1
+✖ an X search longer than one run is read to the old watermark over the next runs (18.639125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'failed' !== 'ok'
+  
+      at TestContext.<anonymous> (file://<repo>/tests/collection.test.ts:74:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ok',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/collection.test.ts:88:1
+✖ a WeChat body that failed for a passing reason is fetched on the next check and analysed again (2.59325ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'failed' !== 'ok'
+  
+      at TestContext.<anonymous> (file://<repo>/tests/collection.test.ts:94:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ok',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/default-model.test.ts:43:1
+✖ one model runs the prefilter, both scores, the writing and the structure (23.981625ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at runPrefilter (file://<repo>/packages/backend/src/editorial/analyze.ts:197:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async runAnalysis (file://<repo>/packages/backend/src/editorial/analyze.ts:341:21)
+      at async analyzeArticle (file://<repo>/packages/backend/src/editorial/analyze.ts:424:15)
+      at async TestContext.<anonymous> (file://<repo>/tests/default-model.test.ts:48:15)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+
+test at tests/events.test.ts:80:1
+✖ a detach made while the model is deciding the report's fact stands (58.564917ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at judgeBatch (file://<repo>/packages/backend/src/events/group.ts:280:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async decide (file://<repo>/packages/backend/src/events/group.ts:671:24)
+      at async groupArticle (file://<repo>/packages/backend/src/events/group.ts:598:18)
+      at async TestContext.<anonymous> (file://<repo>/tests/events.test.ts:83:3)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+
+test at tests/events.test.ts:97:1
+✖ a report joins the fact the model names, and a revision keeps that membership without asking again (9.475333ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at judgeBatch (file://<repo>/packages/backend/src/events/group.ts:280:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async decide (file://<repo>/packages/backend/src/events/group.ts:671:24)
+      at async groupArticle (file://<repo>/packages/backend/src/events/group.ts:598:18)
+      at async TestContext.<anonymous> (file://<repo>/tests/events.test.ts:101:17)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/events.test.ts:117:1
+✖ an explicit regroup drops the automatic membership and decides again (7.974333ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at judgeBatch (file://<repo>/packages/backend/src/events/group.ts:280:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async decide (file://<repo>/packages/backend/src/events/group.ts:671:24)
+      at async groupArticle (file://<repo>/packages/backend/src/events/group.ts:598:18)
+      at async TestContext.<anonymous> (file://<repo>/tests/events.test.ts:121:17)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/events.test.ts:135:1
+✖ a report waiting for a regroup is not evidence for others, and its own turn decides it again (19.304292ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at judgeBatch (file://<repo>/packages/backend/src/events/group.ts:280:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async decide (file://<repo>/packages/backend/src/events/group.ts:671:24)
+      at async groupArticle (file://<repo>/packages/backend/src/events/group.ts:598:18)
+      at async TestContext.<anonymous> (file://<repo>/tests/events.test.ts:155:17)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/events.test.ts:164:1
+✖ a development attaches to the story's earliest fact that still holds reports (8.759792ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at judgeBatch (file://<repo>/packages/backend/src/events/group.ts:280:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async decide (file://<repo>/packages/backend/src/events/group.ts:671:24)
+      at async groupArticle (file://<repo>/packages/backend/src/events/group.ts:598:18)
+      at async TestContext.<anonymous> (file://<repo>/tests/events.test.ts:178:20)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/events.test.ts:196:1
+✖ a story's root is the fact reported first, not the one with the lowest number (9.945042ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at judgeBatch (file://<repo>/packages/backend/src/events/group.ts:280:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async decide (file://<repo>/packages/backend/src/events/group.ts:671:24)
+      at async groupArticle (file://<repo>/packages/backend/src/events/group.ts:598:18)
+      at async TestContext.<anonymous> (file://<repo>/tests/events.test.ts:210:20)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/events.test.ts:218:1
+✖ two stories a report ties together merge when both models see one story in their roots (10.313625ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at judgeBatch (file://<repo>/packages/backend/src/events/group.ts:280:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async decide (file://<repo>/packages/backend/src/events/group.ts:671:24)
+      at async groupArticle (file://<repo>/packages/backend/src/events/group.ts:598:18)
+      at async TestContext.<anonymous> (file://<repo>/tests/events.test.ts:227:20)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/events.test.ts:241:1
+✖ two stories stay apart when their roots are different events, whatever the report ties them with (9.896042ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at judgeBatch (file://<repo>/packages/backend/src/events/group.ts:280:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async decide (file://<repo>/packages/backend/src/events/group.ts:671:24)
+      at async groupArticle (file://<repo>/packages/backend/src/events/group.ts:598:18)
+      at async TestContext.<anonymous> (file://<repo>/tests/events.test.ts:251:20)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/events.test.ts:262:1
+✖ a story whose reports all moved away keeps its address: it redirects to where the last one went (10.345958ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at judgeBatch (file://<repo>/packages/backend/src/events/group.ts:280:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async decide (file://<repo>/packages/backend/src/events/group.ts:671:24)
+      at async groupArticle (file://<repo>/packages/backend/src/events/group.ts:598:18)
+      at async TestContext.<anonymous> (file://<repo>/tests/events.test.ts:274:17)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/events.test.ts:287:1
+✖ stories that reports keep tying together without merging list each other as related (8.894042ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at judgeBatch (file://<repo>/packages/backend/src/events/group.ts:280:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async decide (file://<repo>/packages/backend/src/events/group.ts:671:24)
+      at async groupArticle (file://<repo>/packages/backend/src/events/group.ts:598:18)
+      at async TestContext.<anonymous> (file://<repo>/tests/events.test.ts:302:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/listings.test.ts:84:1
+✖ an article a feed lists twice is stored once and stays put across fetches (39.741625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'failed' !== 'ok'
+  
+      at TestContext.<anonymous> (file://<repo>/tests/listings.test.ts:85:44)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ok',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/listings.test.ts:91:1
+✖ sections of one page are separate articles when the source keeps fragments (4.247334ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'failed' !== 'ok'
+  
+      at TestContext.<anonymous> (file://<repo>/tests/listings.test.ts:92:44)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ok',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/listings.test.ts:100:1
+✖ a feed that garbles different characters on every load keeps one version (22.911291ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'failed' !== 'ok'
+  
+      at TestContext.<anonymous> (file://<repo>/tests/listings.test.ts:101:44)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ok',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/listings.test.ts:106:1
+✖ a changelog's date headings date its updates and are no articles themselves (4.906625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'failed' !== 'ok'
+  
+      at TestContext.<anonymous> (file://<repo>/tests/listings.test.ts:107:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ok',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/media-performance.test.ts:49:1
+✖ one timeout covers the complete redirect chain (3.051083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    Comparison {
+  +   name: 'Error'
+  -   name: 'TimeoutError'
+    }
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file://<repo>/tests/media-performance.test.ts:50:3)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Outbound collect disabled: COLLECT_ENABLED=true required
+        at assertOutboundEnabled (file://<repo>/packages/backend/src/outbound-policy.ts:24:39)
+        at guardedFetch (file://<repo>/packages/backend/src/lib/http-fetch.ts:64:3)
+        at TestContext.<anonymous> (file://<repo>/tests/media-performance.test.ts:50:24)
+        at Test.runInAsyncScope (node:async_hooks:212:14)
+        at Test.run (node:internal/test_runner/test:1109:25)
+        at Test.start (node:internal/test_runner/test:1006:17)
+        at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5),
+    expected: { name: 'TimeoutError' },
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/media-performance.test.ts:53:1
+✖ simultaneous modes share original bytes, preserve dimensions and use their disk caches (6.765584ms)
+  Error: Outbound collect disabled: COLLECT_ENABLED=true required
+      at assertOutboundEnabled (file://<repo>/packages/backend/src/outbound-policy.ts:24:39)
+      at guardedFetch (file://<repo>/packages/backend/src/lib/http-fetch.ts:64:3)
+      at fetchOriginal (file://<repo>/packages/backend/src/media/images.ts:73:21)
+      at original (file://<repo>/packages/backend/src/media/images.ts:58:11)
+      at produce (file://<repo>/packages/backend/src/media/images.ts:142:21)
+      at async Promise.all (index 0)
+      at async TestContext.<anonymous> (file://<repo>/tests/media-performance.test.ts:54:39)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/media-performance.test.ts:61:1
+✖ failed originals are not retried for every mode (6.119208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file://<repo>/tests/media-performance.test.ts:64:10)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/media-performance.test.ts:90:1
+✖ successive responsive candidates reuse the completed original download (0.345833ms)
+  Error: Outbound collect disabled: COLLECT_ENABLED=true required
+      at assertOutboundEnabled (file://<repo>/packages/backend/src/outbound-policy.ts:24:39)
+      at guardedFetch (file://<repo>/packages/backend/src/lib/http-fetch.ts:64:3)
+      at fetchOriginal (file://<repo>/packages/backend/src/media/images.ts:73:21)
+      at original (file://<repo>/packages/backend/src/media/images.ts:58:11)
+      at produce (file://<repo>/packages/backend/src/media/images.ts:142:21)
+      at async TestContext.<anonymous> (file://<repo>/tests/media-performance.test.ts:93:17)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/media-performance.test.ts:100:1
+✖ the original cache expires and evicts old entries instead of retaining every source (0.529541ms)
+  Error: Outbound collect disabled: COLLECT_ENABLED=true required
+      at assertOutboundEnabled (file://<repo>/packages/backend/src/outbound-policy.ts:24:39)
+      at guardedFetch (file://<repo>/packages/backend/src/lib/http-fetch.ts:64:3)
+      at fetchOriginal (file://<repo>/packages/backend/src/media/images.ts:73:21)
+      at original (file://<repo>/packages/backend/src/media/images.ts:58:11)
+      at produce (file://<repo>/packages/backend/src/media/images.ts:142:21)
+      at async TestContext.<anonymous> (file://<repo>/tests/media-performance.test.ts:104:3)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/media-performance.test.ts:170:1
+✖ image HTTP responses keep issued URLs valid, reject tampering before fetching and do not vary on Accept (40.623208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  502 !== 200
+  
+      at TestContext.<anonymous> (file://<repo>/tests/media-performance.test.ts:187:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 502,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/media-performance.test.ts:201:1
+✖ background preparation turns a cached GIF into a smaller animated WebP with every frame and its timing (0.385333ms)
+  Error: Outbound collect disabled: COLLECT_ENABLED=true required
+      at assertOutboundEnabled (file://<repo>/packages/backend/src/outbound-policy.ts:24:39)
+      at guardedFetch (file://<repo>/packages/backend/src/lib/http-fetch.ts:64:3)
+      at fetchOriginal (file://<repo>/packages/backend/src/media/images.ts:73:21)
+      at original (file://<repo>/packages/backend/src/media/images.ts:58:11)
+      at produce (file://<repo>/packages/backend/src/media/images.ts:142:21)
+      at async TestContext.<anonymous> (file://<repo>/tests/media-performance.test.ts:203:18)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/receipts.test.ts:40:1
+✖ an answer already received is reused instead of bought again (0.365167ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at ask (file://<repo>/tests/receipts.test.ts:22:3)
+      at TestContext.<anonymous> (file://<repo>/tests/receipts.test.ts:44:23)
+      at Test.runInAsyncScope (node:async_hooks:212:14)
+      at Test.run (node:internal/test_runner/test:1109:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/receipts.test.ts:52:1
+✖ retries of unusable answers stop at the budget, and every request sent is counted (3.873875ms)
+  AssertionError [ERR_ASSERTION]: requests sent
+  
+  0 !== 2
+  
+      at TestContext.<anonymous> (file://<repo>/tests/receipts.test.ts:72:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/receipts.test.ts:94:1
+✖ an unknown outcome is released automatically once, so a lost answer costs at most one repeat (1.600791ms)
+  TypeError: Cannot read properties of undefined (reading 'status')
+      at status (file://<repo>/tests/receipts.test.ts:102:128)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file://<repo>/tests/receipts.test.ts:106:16)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/rss-conditional.test.ts:40:1
+✖ RSS first backfill, ordinary window, 304, revision and config edits preserve collection behavior (15.511917ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 30
+  
+      at TestContext.<anonymous> (file://<repo>/tests/rss-conditional.test.ts:43:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 30,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/rss-conditional.test.ts:73:1
+✖ Last-Modified works without ETag and changing redirect targets cannot accept an unrelated 304 (2.265167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file://<repo>/tests/rss-conditional.test.ts:76:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/signals.test.ts:66:1
+✖ a discussion post that came before any report is grouped again when a report founds its fact (64.462417ms)
+  AssertionError [ERR_ASSERTION]: a post that found nothing is recorded as such
+  + actual - expected
+  
+  + undefined
+  - 'signal-unmatched'
+  
+      at TestContext.<anonymous> (file://<repo>/tests/signals.test.ts:75:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'signal-unmatched',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/signals.test.ts:89:1
+✖ history waits behind live work and founds no event; a new source's post from today is news (22.738833ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at judgeBatch (file://<repo>/packages/backend/src/events/group.ts:280:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async decide (file://<repo>/packages/backend/src/events/group.ts:671:24)
+      at async groupArticle (file://<repo>/packages/backend/src/events/group.ts:598:18)
+      at async TestContext.<anonymous> (file://<repo>/tests/signals.test.ts:99:20)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/signals.test.ts:103:1
+✖ a discussion post that quotes a post not yet collected joins its story when the original arrives (10.676584ms)
+  Error: Model calls are disabled (MODEL_CALLS_ENABLED=false)
+      at chatJson (file://<repo>/packages/backend/src/providers/llm.ts:158:40)
+      at judgeBatch (file://<repo>/packages/backend/src/events/group.ts:280:21)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async decide (file://<repo>/packages/backend/src/events/group.ts:671:24)
+      at async groupArticle (file://<repo>/packages/backend/src/events/group.ts:598:18)
+      at async TestContext.<anonymous> (file://<repo>/tests/signals.test.ts:114:17)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/source-rules.test.ts:103:1
+✖ feed entries outside the source's URL rules are skipped (2.82675ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'failed' !== 'ok'
+  
+      at TestContext.<anonymous> (file://<repo>/tests/source-rules.test.ts:104:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ok',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/source-rules.test.ts:108:1
+✖ detail rules fill what the listing lacks, and a detail title survives the next listing (1.955709ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'failed' !== 'ok'
+  
+      at TestContext.<anonymous> (file://<repo>/tests/source-rules.test.ts:109:44)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ok',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/source-rules.test.ts:117:1
+✖ a Jina listing is read on every fetch, and buys a detail rendering only where a regex rule needs it (1.29175ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'failed' !== 'ok'
+  
+      at TestContext.<anonymous> (file://<repo>/tests/source-rules.test.ts:118:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ok',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/source-rules.test.ts:130:1
+✖ detail HTML supplies the ordinary extracted body once, while short pages keep extraction pending (0.556875ms)
+  TypeError: Cannot read properties of undefined (reading 'body_status')
+      at TestContext.<anonymous> (file://<repo>/tests/source-rules.test.ts:134:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/sources.test.ts:121:1
+✖ the MiMo homepage lists its posts and model pages, not its menu (0.311916ms)
+  Error: Outbound collect disabled: COLLECT_ENABLED=true required
+      at assertOutboundEnabled (file://<repo>/packages/backend/src/outbound-policy.ts:24:39)
+      at guardedFetch (file://<repo>/packages/backend/src/lib/http-fetch.ts:64:3)
+      at fetchListingText (file://<repo>/packages/backend/src/sources/web-list.ts:106:21)
+      at fetchWebList (file://<repo>/packages/backend/src/sources/web-list.ts:290:41)
+      at TestContext.<anonymous> (file://<repo>/tests/sources.test.ts:122:21)
+      at Test.runInAsyncScope (node:async_hooks:212:14)
+      at Test.run (node:internal/test_runner/test:1109:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:786:18)
+      at Test.postRun (node:internal/test_runner/test:1238:19)
+      at Test.run (node:internal/test_runner/test:1166:12)
+
+test at tests/sources.test.ts:132:1
+✖ a MiMo homepage without the list fails the fetch instead of listing its menu (0.798459ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /mimo_home/. Input:
+  
+  'Error: Outbound collect disabled: COLLECT_ENABLED=true required'
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file://<repo>/tests/sources.test.ts:133:3)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Outbound collect disabled: COLLECT_ENABLED=true required
+        at assertOutboundEnabled (file://<repo>/packages/backend/src/outbound-policy.ts:24:39)
+        at guardedFetch (file://<repo>/packages/backend/src/lib/http-fetch.ts:64:3)
+        at fetchListingText (file://<repo>/packages/backend/src/sources/web-list.ts:106:21)
+        at fetchWebList (file://<repo>/packages/backend/src/sources/web-list.ts:290:41)
+        at TestContext.<anonymous> (file://<repo>/tests/sources.test.ts:133:24)
+        at Test.runInAsyncScope (node:async_hooks:212:14)
+        at Test.run (node:internal/test_runner/test:1109:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:786:18)
+        at Test.postRun (node:internal/test_runner/test:1238:19)
+        at Test.run (node:internal/test_runner/test:1166:12),
+    expected: /mimo_home/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/sources.test.ts:166:1
+✖ feed text that only teases the article is a summary: the page is fetched before judging (0.253791ms)
+  Error: Outbound collect disabled: COLLECT_ENABLED=true required
+      at assertOutboundEnabled (file://<repo>/packages/backend/src/outbound-policy.ts:24:39)
+      at guardedFetch (file://<repo>/packages/backend/src/lib/http-fetch.ts:64:3)
+      at fetchRss (file://<repo>/packages/backend/src/sources/rss.ts:123:19)
+      at TestContext.<anonymous> (file://<repo>/tests/sources.test.ts:167:22)
+      at Test.runInAsyncScope (node:async_hooks:212:14)
+      at Test.run (node:internal/test_runner/test:1109:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:786:18)
+      at Test.postRun (node:internal/test_runner/test:1238:19)
+      at Test.run (node:internal/test_runner/test:1166:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+test at tests/sources.test.ts:207:1
+✖ dates in yyyymmdd and in JSON-LD are read (0.177791ms)
+  Error: Outbound collect disabled: COLLECT_ENABLED=true required
+      at assertOutboundEnabled (file://<repo>/packages/backend/src/outbound-policy.ts:24:39)
+      at guardedFetch (file://<repo>/packages/backend/src/lib/http-fetch.ts:64:3)
+      at fetchJsonList (file://<repo>/packages/backend/src/sources/json-list.ts:139:21)
+      at TestContext.<anonymous> (file://<repo>/tests/sources.test.ts:208:22)
+      at Test.runInAsyncScope (node:async_hooks:212:14)
+      at Test.run (node:internal/test_runner/test:1109:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:786:18)
+      at Test.postRun (node:internal/test_runner/test:1238:19)
+      at Test.run (node:internal/test_runner/test:1166:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+test at tests/translate-shutdown.test.ts:52:41
+✖ SIGTERM finishes the sent normal batch and resumes from its receipt (293.387292ms)
+  AssertionError [ERR_ASSERTION]: translation ended before a request
+      at file://<repo>/tests/translate-shutdown.test.ts:61:80
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file://<repo>/tests/translate-shutdown.test.ts:61:3)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at tests/translate-shutdown.test.ts:52:41
+✖ SIGTERM finishes the sent misaligned batch and resumes from its receipt (257.789458ms)
+  AssertionError [ERR_ASSERTION]: translation ended before a request
+      at file://<repo>/tests/translate-shutdown.test.ts:61:80
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file://<repo>/tests/translate-shutdown.test.ts:61:3)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at tests/translate.test.ts:70:1
+✖ a text corrected while its translation was running is translated again, and the old translation is not shown (40.986459ms)
+  AssertionError [ERR_ASSERTION]: the run ended without asking the model
+      at file://<repo>/tests/translate.test.ts:79:64
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file://<repo>/tests/translate.test.ts:79:3)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at tests/translate.test.ts:99:1
+✖ links and images inside a paragraph survive the translation, or the paragraph stays in the original (11.342875ms)
+  TypeError: Cannot read properties of undefined (reading 'body_html')
+      at TestContext.<anonymous> (file://<repo>/tests/translate.test.ts:112:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/translate.test.ts:118:1
+✖ the post a selected X post quotes is translated once and shown with the item (14.113583ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(run.quotes >= 1)
+  
+      at TestContext.<anonymous> (file://<repo>/tests/translate.test.ts:129:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/x-article.test.ts:65:1
+✖ a post that links an X Article waits for extraction, which brings the article in as a new revision (23.51075ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'failed' !== 'ok'
+  
+      at TestContext.<anonymous> (file://<repo>/tests/x-article.test.ts:66:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ok',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/x-article.test.ts:91:1
+✖ an article that cannot be fetched is flagged to the model, not passed off as a complete body (2.269458ms)
+  TypeError: Cannot read properties of undefined (reading 'id')
+      at idOf (file://<repo>/tests/x-article.test.ts:50:139)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file://<repo>/tests/x-article.test.ts:92:14)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+
+test at tests/x-shards.test.ts:93:1
+✖ one search reads a shard; each account gets its own posts, run and watermark (8.057125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'failed' !== 'ok'
+  
+      at TestContext.<anonymous> (file://<repo>/tests/x-shards.test.ts:96:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ok',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/x-shards.test.ts:110:1
+✖ a page failing after the first keeps what was read and goes on from there next run (5.323208ms)
+  AssertionError [ERR_ASSERTION]: the accounts are not failed for a later page
+  
+  'failed' !== 'ok'
+  
+      at TestContext.<anonymous> (file://<repo>/tests/x-shards.test.ts:116:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ok',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/x-shards.test.ts:127:1
+✖ a quiet account's old newest post does not drag the shard's search back: its last check does (3.247708ms)
+  TypeError: Cannot read properties of null (reading '1')
+      at TestContext.<anonymous> (file://<repo>/tests/x-shards.test.ts:133:64)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1116:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:786:7)
+backend tests exit=1

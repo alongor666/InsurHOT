@@ -1,0 +1,20 @@
+✔ public route subsets produce the same complete navigation data; filters still differ (361.279084ms)
+✔ HTML and navigation share freshness; cookies do not personalize public results (52.728584ms)
+✔ missing routes cannot be hidden by a root-only request; errors and redirects stay uncached (32.230792ms)
+✔ admin data and actions never become public cache entries (3.291041ms)
+✔ an elapsed release deadline cannot be extended by a fresh page/data response (19.788625ms)
+✔ browser freshness shares the selected deadline, including slow sibling loaders (2334.504125ms)
+✔ the edge may keep a page longer than browsers, which a withdrawal purge cannot reach (2.890833ms)
+✔ browser caching preserves noindex and private sign-in responses (14.95775ms)
+✔ a visitor cannot name its own address to the api without a trusted proxy in front (4.703958ms)
+✔ public and admin loaders forward cancellation without turning it into a 503 (31.734167ms)
+✔ history cache batches writes and survives eviction, expiry and storage denial (68.584917ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3067.320333
+exit=0
