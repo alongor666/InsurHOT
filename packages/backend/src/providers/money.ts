@@ -60,7 +60,7 @@ export function budgetMonth(at: Date): string {
 // ---------------------------------------------------------------------------------------------------
 // Capability and subject
 
-const COLLECT_SERVICES: Record<string, string> = { jina: "collect.jina", dajiala: "collect.dajiala", socialdata: "collect.socialdata" };
+const COLLECT_SERVICES: Record<string, string> = { jina: "collect.jina", dajiala: "collect.dajiala" };
 
 /** Purpose to model capability, from editorial/models.ts (loaded lazily: that module imports the providers). */
 export async function modelCapabilities(): Promise<Map<string, string>> {
@@ -90,7 +90,7 @@ const ARTICLE = /^article:[A-Za-z0-9_-]{1,80}$/;
 const ARTICLE_FACT = /^(article:[A-Za-z0-9_-]{1,80}):fact:\d+$/;
 const STORY = /^story:\d+$/;
 const STORY_PAIR = /^story:(\d+):(\d+)$/;
-const OTHER = /^(?:quote:\d+|report:(?:daily|weekly|monthly):[0-9A-Za-z-]{1,20})$/;
+const OTHER = /^(?:report:(?:daily|weekly|monthly):[0-9A-Za-z-]{1,20})$/;
 
 /**
  * The subjects a model step counts against. `article:a1@4#2` and `article:a1:fact:9` are `article:a1`; a

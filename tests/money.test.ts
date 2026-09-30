@@ -89,11 +89,11 @@ test("capabilities: collectors by service, embeddings by purpose, models by purp
   assert.equal(capabilityFor("jina", "body_fallback", purposes), "collect.jina");
   assert.equal(capabilityFor("dajiala", "mp_history", purposes), "collect.dajiala");
   // A collector is collection money whatever purpose it sends, even a model step's.
-  assert.equal(capabilityFor("socialdata", "translate_quoted", purposes), "collect.socialdata");
+  assert.equal(capabilityFor("jina", "translate_body", purposes), "collect.jina");
   assert.throws(() => capabilityFor("zhipu", "something_new", purposes), refused("unmapped_purpose"));
 
   // Every purpose under packages/backend/src is a model purpose with a capability, or one only collectors use.
-  const collectorOnly = new Set(["mp_history", "mp_article", "source_fetch", "source_listing", "source_detail", "body_fallback", "x_article"]);
+  const collectorOnly = new Set(["mp_history", "mp_article", "source_listing", "source_detail", "body_fallback"]);
   const literals = new Set<string>();
   const templates = new Set<string>();
   const walk = (dir: string) => {
@@ -107,7 +107,7 @@ test("capabilities: collectors by service, embeddings by purpose, models by purp
     }
   };
   walk(path.join(REPO_ROOT, "packages/backend/src"));
-  assert.ok(literals.size >= 20, `found ${literals.size} purposes`);
+  assert.ok(literals.size >= 17, `found ${literals.size} purposes`);
   for (const purpose of literals) {
     if (collectorOnly.has(purpose)) assert.equal(purposes.has(purpose), false, `${purpose} is collector-only and must not be a model purpose`);
     else assert.ok(purpose === "embedding" || purposes.has(purpose), `purpose "${purpose}" has no capability`);
@@ -128,14 +128,13 @@ test("subjects: revisions, fragments and the fact suffix fold into the subject; 
     ["group", "story:5:5", ["story:5"]],
     ["report", "report:daily:2031-01-05", ["report:daily:2031-01-05"]],
     ["report", "report:weekly:2031-W05", ["report:weekly:2031-W05"]],
-    ["translate", "quote:1900000000000000001", ["quote:1900000000000000001"]],
     ["collect.jina", "source:abc", []],
     ["collect.dajiala", "bare-source-id", []],
     ["embedding", "article:first-of-batch", []],
   ];
   for (const [capability, subject, keys] of cases) assert.deepEqual(subjectKeysFor(capability, subject), keys, `${capability} ${subject}`);
   const bad = ["", null, undefined, "no-kind", "@4", ":x", "Article:a1", "article: a1", "article:a1:fact:2:fact:3", "article:a1:extra", "story:1:2:3", "story:x",
-    "story:1:fact:2", "report:yearly:2031", "source:abc", "x:abc", "x:1900000000000000002", "quote:"];
+    "story:1:fact:2", "report:yearly:2031", "source:abc", "x:abc", "x:1900000000000000002", "quote:", "quote:1900000000000000001"];
   for (const subject of bad) assert.throws(() => subjectKeysFor("score", subject), refused("missing_subject"), String(subject));
 });
 
@@ -290,7 +289,7 @@ test("embeddings, per-request and per-unit bounds", () => {
   assert.equal(perRequestWorstCase(price({ perRequest: 0.14 })), 0.14);
   assert.throws(() => perRequestWorstCase(price()), refused("price_shape"));
   assert.equal(perUnitWorstCase(price({ perUnit: 0.0002, maxUnitsPerRequest: 20 })), 0.004);
-  // Jina and SocialData today: a unit price without a cap the provider enforces.
+  // Jina today: a unit price without a cap the provider enforces.
   assert.throws(() => perUnitWorstCase(price({ perUnit: 0.0002 })), refused("unbounded_units"));
   assert.throws(() => perUnitWorstCase(price({ maxUnitsPerRequest: 20 })), refused("unbounded_units"));
 });

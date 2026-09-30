@@ -11,22 +11,6 @@ const RETRY_DAYS = 30;
 const MP_RETRY_DAYS = 3;
 const MP_PAUSE_MS = 3000;
 
-/** X accounts: the avatar on the account's own latest post, kept current as avatars change. */
-async function refreshXAvatars(): Promise<number> {
-  const rows = await sql`
-    UPDATE sources s SET icon_url = x.avatar
-    FROM (
-      SELECT DISTINCT ON (a.source_id) a.source_id, a.x_post->>'avatarUrl' AS avatar
-      FROM articles a JOIN sources xs ON xs.id = a.source_id AND xs.kind = 'x_search'
-      WHERE a.x_post ? 'avatarUrl'
-        AND lower(xs.name) LIKE '%(@' || lower(a.x_post->>'handle') || ')'
-      ORDER BY a.source_id, a.discovered_at DESC
-    ) x
-    WHERE s.id = x.source_id AND s.icon_url IS DISTINCT FROM x.avatar
-    RETURNING s.id`;
-  return rows.length;
-}
-
 /** A page's HTML; 公众号 article pages run to several megabytes, home pages rarely past four. */
 async function page(url: string, maxBytes = 4_000_000): Promise<{ html: string; url: string } | null> {
   try {
@@ -114,7 +98,7 @@ async function findMissingIcons(): Promise<{ checked: number; found: number }> {
     SELECT s.id, s.kind, s.config, a.urls
     FROM sources s
     LEFT JOIN LATERAL (SELECT array_agg(url) AS urls FROM (SELECT url FROM articles WHERE source_id = s.id ORDER BY discovered_at DESC LIMIT 10) r) a ON true
-    WHERE s.icon_url IS NULL AND s.kind <> 'x_search'
+    WHERE s.icon_url IS NULL
       AND (s.icon_checked_at IS NULL OR s.icon_checked_at < now() - make_interval(days => CASE WHEN s.kind = 'mp_account' THEN ${MP_RETRY_DAYS}::int ELSE ${RETRY_DAYS}::int END))
     ORDER BY s.icon_checked_at NULLS FIRST, s.id
     LIMIT ${BATCH}`;
@@ -128,7 +112,5 @@ async function findMissingIcons(): Promise<{ checked: number; found: number }> {
 }
 
 export async function refreshSourceIcons() {
-  const x = await refreshXAvatars();
-  const sites = await findMissingIcons();
-  return { xAvatars: x, ...sites };
+  return findMissingIcons();
 }

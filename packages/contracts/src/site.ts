@@ -2,7 +2,7 @@
 // but it is served from the same public read layer as v1, RSS and MCP.
 import type { CategoryKey, ChannelKey } from "./taxonomy.ts";
 
-export type SourceKind = "rss" | "web_list" | "json_list" | "x_search" | "mp_account" | "external";
+export type SourceKind = "rss" | "web_list" | "json_list" | "mp_account" | "external";
 
 export interface SourceRef {
   id: string;
@@ -11,28 +11,6 @@ export interface SourceRef {
   firstParty: boolean;
   iconUrl: string | null;
   iconSrcSet?: string;
-}
-
-export interface MediaView {
-  kind: "image" | "video";
-  url: string;
-  width: number | null;
-  height: number | null;
-  alt: string | null;
-  poster: string | null;
-  srcSet?: string;
-}
-
-export interface XPostView {
-  authorName: string;
-  handle: string;
-  avatarUrl: string | null;
-  avatarSrcSet?: string;
-  text: string;
-  translation: string | null;
-  /** translation: Chinese translation of the quoted post, when it is in another language. */
-  quoted: { authorName: string; handle: string; text: string; url: string; translation: string | null } | null;
-  media: MediaView[];
 }
 
 export interface StoryRef {
@@ -56,17 +34,13 @@ export interface ItemSummary {
   tags: string[];
   score: number | null;
   selected: boolean;
-  channel: "news" | "x";
+  channel: "news";
   story: StoryRef | null;
-  x: XPostView | null;
 }
 
 /** The fields rendered by a site feed card; full original text lives in the item detail. */
 export interface FeedItemSummary extends Pick<ItemSummary, "id" | "title" | "summary" | "reason" | "publishedAt" | "timelineAt" | "category" | "tags" | "score" | "selected" | "channel"> {
   source: Pick<SourceRef, "name">;
-  x: (Pick<XPostView, "authorName" | "handle" | "avatarUrl" | "avatarSrcSet" | "media"> & {
-    quoted: Omit<NonNullable<XPostView["quoted"]>, "url"> | null;
-  }) | null;
 }
 
 export interface GroupInfo {
@@ -354,7 +328,7 @@ export interface ReportIndexEntry {
 export interface SiteStats {
   /** Sources collected from now. */
   sources: number;
-  /** Enabled sources by kind: x_search, rss, web_list, mp_account, json_list. */
+  /** Enabled sources by kind: rss, web_list, mp_account, json_list. */
   sourceKinds: Record<string, number>;
   /** Of them, sources that only count toward heat (their items never reach 精选). */
   heatOnlySources: number;
@@ -371,8 +345,7 @@ export interface SiteStats {
 }
 
 /** A reading page transfers one language; the canonical item retains both for exports. */
-export interface SiteItemDetail extends Omit<ItemDetail, "x"> {
-  x: Omit<XPostView, "text" | "translation"> | null;
+export interface SiteItemDetail extends ItemDetail {
   hasTranslation: boolean;
   bodyLanguage: "zh" | "original";
 }

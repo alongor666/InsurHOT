@@ -1706,7 +1706,7 @@ R3 仍不一致或低置信 ─► 人工队列
 |---|---|---|---|
 | ADR-000 | Product Constitution 与修宪流程 | 采纳 §3；修改须经 ADR | Proposed |
 | ADR-001 | 以 AIHOT `589f79e` 为一次性基线导入，而非 GitHub fork 或重写 | 导入（保留 MIT 声明与 NOTICE），`UPSTREAM.md` 追踪 | Accepted（2026-09-30 Codex技术裁决；见 docs/adr/001-pinned-upstream-import.md；应用待实施） |
-| ADR-002 | 移除 leaderboard 与 Codex monitor 代码 | 删除代码；治理范式写入 ADR-013 | Accepted（2026-09-30 owner 批准；范围已扩大到 X 采集、引文翻译与 model-providers，以 docs/adr/002-optional-module-removal.md 为准；第 1 步关闭开关已合入；第 2 步先删 leaderboard 与 monitor，X 采集与引文翻译的删除未实施） |
+| ADR-002 | 移除 leaderboard 与 Codex monitor 代码 | 删除代码；治理范式写入 ADR-013 | Accepted（2026-09-30 owner 批准；范围已扩大到 X 采集、引文翻译与 model-providers，以 docs/adr/002-optional-module-removal.md 为准；已实施：关闭开关、删除 leaderboard 与 monitor、删除 X 采集与引文翻译） |
 | ADR-003 | 重命名与品牌清理 | `@insurhot/*`；检查脚本禁止对外出现 AIHOT | Proposed |
 | ADR-004 | Evidence 数据模型（Document / Passage / Assertion / Evidence） | §20 | Proposed |
 | ADR-005 | Source Model 2.0（evidence_tier + 六维度 + reuse_class） | §9 | Proposed |
