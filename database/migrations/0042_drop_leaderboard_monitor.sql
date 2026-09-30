@@ -10,3 +10,6 @@ DROP TABLE fx_rates;
 -- What the two modules kept in settings: the leaderboard's fetch state and last check, and the model
 -- chosen for the monitor capability.
 DELETE FROM settings WHERE key IN ('leaderboard.fetch', 'leaderboard.last_check', 'models.monitor');
+
+-- An alert of theirs still open would otherwise close with a "recovered" message for a module that no longer exists.
+UPDATE settings SET value = value - 'monitor.stuck' - 'monitor.review' - 'leaderboard.fetch' WHERE key = 'alerts.state';

@@ -23,6 +23,7 @@ ADR-002 第 2 步拆成两个 PR：本 PR 删 leaderboard、monitor 与只有模
 
 - drop `lb_models`、`lb_aliases`、`lb_snapshots`、`lb_scores`、`lb_runs`、`lb_rankings`、`lb_prices`、`monitor_posts`、`monitor_events`、`monitor_event_posts`、`monitor_state`、`fx_rates`（12 张表，索引随表删除）。
 - 删除 `settings` 里两模块的 3 个键：`leaderboard.fetch`、`leaderboard.last_check`、`models.monitor`。
+- 从 `alerts.state` 里去掉两模块的三个告警键（`monitor.stuck`、`monitor.review`、`leaderboard.fetch`）：否则一条还开着的旧告警会在下次检查时发一条「已恢复」（第一轮评审实测）。其他告警键不动。
 - **保留** `notify_targets`、`deliveries`、`delivery_leases`（与前述表同在迁移 0003，属通用推送）。
 - 没有改写任何历史迁移文件。
 
@@ -31,7 +32,7 @@ ADR-002 第 2 步拆成两个 PR：本 PR 删 leaderboard、monitor 与只有模
 ## 没有动的
 
 - 付费闭锁：`outbound-policy.ts`、`receipts.ts` 未改；`tests/paid-lock-blocked*.txt` 未改（被删的两个测试文件本来就不在清单里）。`assertPaidOutboundDisabled()` 的调用点由 4 个变为 3 个——第 4 个在被删除的 `leaderboard/fetch/sources/artificial-analysis.ts` 里；其余 3 个原样。
-- 根目录 `LICENSE` 与 `NOTICE` 未改。`NOTICE` 仍列着已删除的两个素材目录，许可文件的处理留给 ADR-003。
+- 根目录 `LICENSE` 与 `NOTICE` 未改。`NOTICE` 仍列着已删除的两个素材目录，那句「This repository also contains」对这两项已不成立；许可文件的处理留给 ADR-003，已在 #12 登记为待办。
 - `vendor-manifests/` 的上游清单与映射未改：它们记录 M0.2 导入时的 489 个文件，原样校验本来就只适用于 M0.2 树（见 `UPSTREAM.md`）。
 - X 采集与引文翻译的全部代码、表与测试。`providers/socialdata.ts` 的 `getTweet` 删除监控后已无调用方，随下一个 PR 整个文件删除。
 - `deliveries` 里历史的 `subject_kind = 'codex_reset'` 行（如有）不处理；该列没有 CHECK 约束。
@@ -55,7 +56,7 @@ ADR-002 第 2 步拆成两个 PR：本 PR 删 leaderboard、monitor 与只有模
 
 用例数的变化：第 1 步是 155 个、29 个文件；删掉 `leaderboard-worker.test.ts`（2 个）与 `monitor.test.ts`（2 个），`features-off.test.ts`（4 个）改写为 `removed-modules.test.ts`（4 个），所以是 151 个、27 个文件。
 
-**迁移作用在旧库上**：先建一个停在 0041 的库，向 `lb_models`、`lb_aliases`（带外键）、`monitor_state`、`settings`（3 个待删键 + 1 个 `models.score`）、`notify_targets` 各写一行，再跑迁移。结果：12 张表全部消失；三张推送表仍在，`notify_targets` 的行还在；`settings` 只剩 `models.score`；再跑一次迁移报告 up to date。
+**迁移作用在旧库上**：先建一个停在 0041 的库，向 `lb_models`、`lb_aliases`（带外键）、`monitor_state`、`settings`（3 个待删键 + 1 个 `models.score`，以及一条含 `monitor.stuck`、`leaderboard.fetch`、`backup.stale` 三个开着的告警的 `alerts.state`）、`notify_targets` 各写一行，再跑迁移。结果：12 张表全部消失；三张推送表仍在，`notify_targets` 的行还在；`settings` 只剩 `models.score`；`alerts.state` 只剩 `backup.stale`；再跑一次迁移报告 up to date。
 
 **站点**：`/leaderboard`、`/leaderboard/rules`、`/leaderboard/sources`、`/leaderboard/category/coding`、`/leaderboard/methodology`、`/codex-reset`、`/codex-reset/`、`/admin/monitor`、`/api/v1/codex-resets`、`/api/admin/monitor/events`、`/model-providers/openai.svg`、`/og/pages/leaderboard.png` 全部 404；`/`、`/all`、`/more`、`/agent`、`/admin/login` 为 200；首页、`/more`、`/agent` 的 HTML 里没有指向两模块的链接。
 
@@ -63,7 +64,9 @@ ADR-002 第 2 步拆成两个 PR：本 PR 删 leaderboard、monitor 与只有模
 
 **测试的区分力**：`removed-modules.test.ts` 第 4 项在停在 0041 的库上失败（其余 3 项通过），迁到 0042 后通过。前 3 项在第 1 步已做过变异检查（开关打开时失败）；代码删除后这些路由不可能存在，它们现在的作用是防止以后被接回来。
 
-残留搜索：`grep -rn -i "leaderboard\|codex\|lb_\|model-providers\|模型榜\|重置监控" apps packages scripts industry tests reference .env.example`（排除构建产物）只剩：新测试自身、`/agent` 页里 `codex mcp add` 的接入示例、`industry/taxonomy.ts` 与 `industry/prompts/rules-domain.md` 里把 Codex 当作 OpenAI 产品名的分类词（属行业内容，随内容替换处理，不在 ADR-002 内）。
+残留搜索：`grep -rn -i "leaderboard\|codex\|lb_\|model-providers\|模型榜\|重置" apps packages scripts industry tests reference .env.example`（排除构建产物）只剩：新测试自身、`/agent` 页里 `codex mcp add` 的接入示例、`industry/taxonomy.ts` 与 `industry/prompts/rules-domain.md` 里把 Codex 当作 OpenAI 产品名的分类词（属行业内容，随内容替换处理，不在 ADR-002 内）。
+
+第一轮独立评审（绑定 `877cbce`，APPROVE，4 项 P3）已在本版处理：告警文案里残留的「重置通知」改掉（原残留搜索只搜了「重置监控」，漏了它）；迁移清理 `alerts.state`；`removed-modules.test.ts` 第 3 项补上 SocialData 凭据，使被接回的监控调度会被查出；`NOTICE` 一项登记到 #12。另删了已无调用方的 `IconChart`。
 
 ## 未运行
 

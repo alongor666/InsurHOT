@@ -95,13 +95,12 @@ export async function collectFindings(now = Date.now()): Promise<Finding[]> {
       key: "deliveries.failed",
       level: "today",
       title: "飞书内容群有推送没发出去",
-      impact: `过去 24 小时 ${refused!.n} 条精选或重置通知没进${refused!.target ?? "内容群"}`,
+      impact: `过去 24 小时 ${refused!.n} 条精选推送没进${refused!.target ?? "内容群"}`,
       heals: "不会自动重发",
       action: "转给 AI 处理；如果推送机器人被移出了群，需要你把它加回去",
       detail: refused!.response ?? "",
     });
   }
-
 
   if (backupConfigured()) {
     const [b] = await sql<{ value: { at: string; uploaded: boolean; filesError?: string } }[]>`SELECT value FROM settings WHERE key = 'backup.last'`;

@@ -44,16 +44,19 @@ test("the machine-readable exits do not name them", async () => {
 });
 
 test("no scheduled job belongs to them, whatever the collection switch says", async () => {
-  const saved = process.env.COLLECT_ENABLED;
+  const saved = { collect: process.env.COLLECT_ENABLED, key: process.env.SOCIALDATA_API_KEY };
   process.env.COLLECT_ENABLED = "true";
+  process.env.SOCIALDATA_API_KEY = "test-key-for-the-schedule-list";
   try {
-    // The list is built when the module loads: load a fresh copy with collection on.
+    // The list is built when the module loads: load a fresh copy with collection on and the key the
+    // monitor's jobs used to wait for.
     const { SCHEDULES } = await import(`../apps/worker/src/schedules.ts?removed-modules=${Date.now()}`) as typeof import("../apps/worker/src/schedules.ts");
     const names = SCHEDULES.map((s) => s.name);
     assert.ok(names.includes("sources.schedule"), "collection jobs are listed, so the switch was seen");
     assert.deepEqual(names.filter((n) => /^(leaderboard|monitor)\./.test(n)), []);
   } finally {
-    if (saved === undefined) delete process.env.COLLECT_ENABLED; else process.env.COLLECT_ENABLED = saved;
+    if (saved.collect === undefined) delete process.env.COLLECT_ENABLED; else process.env.COLLECT_ENABLED = saved.collect;
+    if (saved.key === undefined) delete process.env.SOCIALDATA_API_KEY; else process.env.SOCIALDATA_API_KEY = saved.key;
   }
 });
 

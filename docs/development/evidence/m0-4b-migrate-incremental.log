@@ -5,6 +5,7 @@ INSERT 0 1
 INSERT 0 1
 INSERT 0 4
 INSERT 0 1
+INSERT 0 1
 lb_models rows: 1
 lb_aliases rows: 1
 monitor_state rows: 1
@@ -18,5 +19,6 @@ tables left matching lb_*/monitor_*/fx_rates: 0
 kept tables: deliveries, delivery_leases, notify_targets
 notify_targets rows with key t1: 1
 settings keys: models.score
+open alerts left in alerts.state: backup.stale
 $ node scripts/migrate.ts   # again
 database is up to date
