@@ -13,7 +13,8 @@ permissions:
   contents: read
 concurrency:
   group: app-${{ github.ref }}
-  # Superseded PR pushes are cancelled; every push to main keeps its own run.
+  # Superseded PR pushes are cancelled. A running main run is never cancelled; GitHub keeps at most one
+  # queued run per group, so of several quick pushes to main an intermediate queued one may be dropped.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   app:

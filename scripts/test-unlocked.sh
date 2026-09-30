@@ -12,4 +12,5 @@ echo "running: $(printf '%s\n' "$files" | wc -l | tr -d ' ') files; skipping $(s
 # An empty pattern would skip every test, so it is only passed when the list has entries.
 skip_args=(); [ -n "$skip" ] && skip_args=(--test-skip-pattern="$skip")
 # shellcheck disable=SC2086
-exec node --test --test-concurrency=1 --test-timeout=120000 "${skip_args[@]}" $files
+# ${arr[@]+...}: an empty array is "unbound" under set -u before bash 4.4 (macOS ships 3.2).
+exec node --test --test-concurrency=1 --test-timeout=120000 ${skip_args[@]+"${skip_args[@]}"} $files
