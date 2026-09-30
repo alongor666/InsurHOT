@@ -4,7 +4,7 @@ import { outboundFetch } from "../outbound-policy.ts";
 // Development may impersonate an admin with DEV_AUTH_ROLE=admin; production refuses to start with it.
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { config, credential } from "../config.ts";
-import { sql } from "../db.ts";
+import { sql, type Db } from "../db.ts";
 import { sha256 } from "../lib/ids.ts";
 
 export const SESSION_COOKIE = "aihot_admin";
@@ -23,6 +23,8 @@ export interface AdminPrincipal {
   name: string;
   csrf: string;
   dev: boolean;
+  /** "owner" may approve prices and monthly limits (ADR-015). The development stand-in never is. */
+  role: "admin" | "owner";
 }
 
 function secret(): string {
@@ -159,12 +161,12 @@ export async function passwordLogin(password: string, returnTo: string, userAgen
 export async function sessionPrincipal(cookieHeader: string | undefined): Promise<AdminPrincipal | null> {
   const token = parseCookies(cookieHeader)[SESSION_COOKIE];
   if (token) {
-    const [row] = await sql<{ user_id: number; csrf_token: string; name: string | null; email: string | null }[]>`
-      SELECT s.user_id, s.csrf_token, u.display_name AS name, u.email FROM admin_sessions s JOIN admin_users u ON u.id = s.user_id
+    const [row] = await sql<{ user_id: number; csrf_token: string; name: string | null; email: string | null; role: "admin" | "owner" }[]>`
+      SELECT s.user_id, s.csrf_token, u.display_name AS name, u.email, u.role FROM admin_sessions s JOIN admin_users u ON u.id = s.user_id
       WHERE s.id_hash = ${sha256(token)} AND s.expires_at > now()`;
-    if (row) return { userId: row.user_id, name: row.name ?? row.email ?? `admin:${row.user_id}`, csrf: row.csrf_token, dev: false };
+    if (row) return { userId: row.user_id, name: row.name ?? row.email ?? `admin:${row.user_id}`, csrf: row.csrf_token, dev: false, role: row.role };
   }
-  if (config.devAdmin && config.environmentName !== "production") return { userId: null, name: config.devAdmin.displayName, csrf: "dev", dev: true };
+  if (config.devAdmin && config.environmentName !== "production") return { userId: null, name: config.devAdmin.displayName, csrf: "dev", dev: true, role: "admin" };
   return null;
 }
 
@@ -174,8 +176,8 @@ export async function endSession(cookieHeader: string | undefined) {
 }
 
 /** Every manual change: who, when, what, why. */
-export async function audit(actor: string, action: string, subject: string | null, reason: string | null, before: unknown, after: unknown, requestId?: string) {
-  await sql`INSERT INTO audit_log (actor, action, subject, reason, before, after, request_id)
+export async function audit(actor: string, action: string, subject: string | null, reason: string | null, before: unknown, after: unknown, requestId?: string, db: Db = sql) {
+  await db`INSERT INTO audit_log (actor, action, subject, reason, before, after, request_id)
             VALUES (${actor}, ${action}, ${subject}, ${reason}, ${before === null || before === undefined ? null : sql.json(before as never)},
                     ${after === null || after === undefined ? null : sql.json(after as never)}, ${requestId ?? null})`;
 }

@@ -4,6 +4,7 @@ import { sql } from "../db.ts";
 import { audit } from "./auth.ts";
 import { Conflict } from "./sources.ts";
 import { failureGroupSql, queueProcessing, requeueFailed } from "../jobs/content.ts";
+import { settleMoney } from "../providers/money.ts";
 
 const STALE_HEARTBEAT_MS = 3 * 60_000;
 
@@ -77,12 +78,33 @@ export async function runsOverview() {
  * A receipt whose outcome is unknown is not re-sent by the request that lost it. Releasing it marks it
  * failed, so the next attempt calls again; an article that stopped on it goes straight back to
  * processing (one action, not two). Only an unknown receipt is released, once.
+ *
+ * Money (ADR-015): the lost attempt keeps its reservation unless an admin found it not billed
+ * (`billed === false`). Released unchecked (`null`) or found billed, it stays counted. Lock order as in
+ * providers/money.ts: the receipt row, the money calls, then the attempt rows.
  */
-async function release(id: number, error: string, actor: string, note: string, billed: boolean | null) {
-  const [before] = await sql<{ subject: string | null; purpose: string }[]>`
-    UPDATE receipts SET status = 'failed', error = ${error}, updated_at = now() WHERE id = ${id} AND status = 'unknown' RETURNING subject, purpose`;
+async function release(id: number, error: string, actor: string, note: string, billed: boolean | null, acknowledgeFigure = false) {
+  const before = await sql.begin(async (tx) => {
+    const [receipt] = await tx<{ subject: string | null; purpose: string }[]>`SELECT subject, purpose FROM receipts WHERE id = ${id} AND status = 'unknown' FOR UPDATE`;
+    if (!receipt) return null;
+    let moneyReleased = 0;
+    if (billed === false) {
+      const lost = await tx<{ id: number; settled_amount: number | null; reserved_currency: string | null }[]>`
+        SELECT id, settled_amount, reserved_currency FROM receipt_attempts WHERE receipt_id = ${id} AND status = 'unknown' AND holds_reservation ORDER BY id`;
+      const reported = lost.find((a) => a.settled_amount !== null);
+      if (reported && !acknowledgeFigure) {
+        throw new Conflict(`供应商为这次调用报告过金额 ${reported.settled_amount} ${reported.reserved_currency}；确认它确实没有计费后，带上 acknowledgeFigure 再放行`);
+      }
+      for (const a of lost) {
+        await settleMoney(tx, a.id, { kind: "release" });
+        moneyReleased += 1;
+      }
+    }
+    await tx`UPDATE receipts SET status = 'failed', error = ${error}, updated_at = now() WHERE id = ${id}`;
+    await tx`UPDATE receipt_attempts SET status = 'failed', error = ${error} WHERE receipt_id = ${id} AND status = 'unknown'`;
+    return { ...receipt, moneyReleased };
+  }) as { subject: string | null; purpose: string; moneyReleased: number } | null;
   if (!before) return null;
-  await sql`UPDATE receipt_attempts SET status = 'failed', error = ${error} WHERE receipt_id = ${id} AND status = 'unknown'`;
   const article = before.purpose === "analyze_article" ? /^article:([^@]+)@/.exec(before.subject ?? "")?.[1] : undefined;
   let requeued = false;
   if (article) {
@@ -90,18 +112,23 @@ async function release(id: number, error: string, actor: string, note: string, b
                           WHERE id = ${article} AND processing_state = 'failed' RETURNING id`;
     if (a) requeued = !!(await queueProcessing(article, { step: "analyze" }));
   }
-  await audit(actor, "receipt.release", `receipt:${id}`, note, { status: "unknown" }, { status: "failed", billed, requeued });
-  return { id, status: "failed", subject: before.subject, purpose: before.purpose, requeued };
+  await audit(actor, "receipt.release", `receipt:${id}`, note, { status: "unknown" }, { status: "failed", billed, requeued, moneyReleased: before.moneyReleased });
+  return { id, status: "failed", subject: before.subject, purpose: before.purpose, requeued, moneyReleased: before.moneyReleased };
 }
 
-/** Admin, after checking the provider's console: records whether it was billed and releases it. */
-export async function releaseReceipt(id: number, input: { billed: boolean; note: string }, actor: string) {
+/**
+ * Admin, after checking the provider's console: records whether it was billed and releases it. Only
+ * "not billed" gives the lost attempt's money back; the answer is strictly `billed === false`, so a
+ * missing or malformed field keeps the money counted.
+ */
+export async function releaseReceipt(id: number, input: { billed: boolean; note: string; acknowledgeFigure?: boolean }, actor: string) {
   if (!input.note?.trim()) throw new Error("note is required");
+  if (typeof input.billed !== "boolean") throw Object.assign(new Error("billed must be true or false"), { statusCode: 400 });
   const [row] = await sql<{ status: string }[]>`SELECT status FROM receipts WHERE id = ${id}`;
   if (!row) return null;
   if (row.status !== "unknown") throw new Conflict("只有结果未知的回执需要人工核对");
   const error = `人工核对：${input.billed ? "供应商已计费但结果未取回" : "供应商未计费"}。${input.note}`;
-  return release(id, error, actor, input.note, input.billed);
+  return release(id, error, actor, input.note, input.billed, input.acknowledgeFigure === true);
 }
 
 const AUTO_RELEASE_AFTER_MS = 30 * 60_000;
