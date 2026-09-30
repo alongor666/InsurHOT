@@ -70,3 +70,108 @@
 ✖ a file that cannot be a batch is set aside without a request; links, unfinished and fresh files are left alone; nothing leaves the inbox
 ℹ pass 7
 ℹ fail 1
+
+# ---- after review round 1 (the bridge was rewritten; every mutation below is against the new code) ----
+## no mutation
+ℹ pass 11
+ℹ fail 0
+## mutation: the pending file is taken away without checking it is the one that was sent (round-1 behaviour)
+✖ a file put under the same name while its predecessor is being sent is neither archived as that one nor deleted
+ℹ pass 10
+ℹ fail 1
+## mutation: the archive is whatever is at the path, not the bytes that were sent
+✖ a file put under the same name while its predecessor is being sent is neither archived as that one nor deleted
+✖ a file that vanishes mid-run, a leftover of a killed run and a second bridge without the lock lose nothing and stop nothing
+ℹ pass 9
+ℹ fail 2
+## mutation: receipts share the archive directory and name (round-1 layout)
+✖ a batch is delivered once, archived with the server's receipt, and a repeat stores nothing and returns the first receipt
+✖ a redirect is not followed, a full rate window ends the run, and an answer that is not a receipt changes nothing
+✖ a file put under the same name while its predecessor is being sent is neither archived as that one nor deleted
+✖ archives, receipts and refusals never write over one another, whatever the ids and file names
+✖ a file that vanishes mid-run, a leftover of a killed run and a second bridge without the lock lose nothing and stop nothing
+✖ from the command line: the summary and the exit code; the token comes from the environment only and appears in nothing the bridge writes
+ℹ pass 5
+ℹ fail 6
+## mutation: a refusal file name is not checked against its reason file (round-1 behaviour)
+✖ archives, receipts and refusals never write over one another, whatever the ids and file names
+ℹ pass 10
+ℹ fail 1
+## mutation: an answer without ok:true counts as a receipt
+✖ a redirect is not followed, a full rate window ends the run, and an answer that is not a receipt changes nothing
+ℹ pass 10
+ℹ fail 1
+## mutation: a receipt-shaped body with a failing status counts as a receipt
+✖ a redirect is not followed, a full rate window ends the run, and an answer that is not a receipt changes nothing
+ℹ pass 10
+ℹ fail 1
+## mutation: the token is written to the ledger of an unreachable run
+✖ when the server is off, unreachable or refuses the token, the file stays as it is and is delivered later under the same id
+ℹ pass 10
+ℹ fail 1
+## mutation: a file gone since the listing is an error
+✖ a file that vanishes mid-run, a leftover of a killed run and a second bridge without the lock lose nothing and stop nothing
+ℹ pass 10
+ℹ fail 1
+## mutation: links are followed when opening
+✖ a file that cannot be a batch is set aside without a request; links, unfinished and fresh files are left alone; nothing leaves the inbox
+ℹ pass 10
+ℹ fail 1
+## mutation: what a killed run left aside is not recovered
+✖ a file that vanishes mid-run, a leftover of a killed run and a second bridge without the lock lose nothing and stop nothing
+ℹ pass 10
+ℹ fail 1
+## mutation: an empty lock file always counts as a leftover
+✖ one bridge per inbox: a second run does nothing while the first holds the lock; a lock left by a process that is gone is taken over
+ℹ pass 10
+ℹ fail 1
+## mutation: redirects are followed
+✖ a redirect is not followed, a full rate window ends the run, and an answer that is not a receipt changes nothing
+ℹ pass 10
+ℹ fail 1
+## mutation: a conflict (409) is retried instead of set aside
+✖ what the server refuses for good is set aside with the reason; the stored batch stays as it was
+✖ a file put under the same name while its predecessor is being sent is neither archived as that one nor deleted
+ℹ pass 9
+ℹ fail 2
+## mutation: a switched-off server (503) counts as a refusal for good
+✖ when the server is off, unreachable or refuses the token, the file stays as it is and is delivered later under the same id
+ℹ pass 10
+ℹ fail 1
+## mutation: a freshly modified file is sent
+✖ a file that cannot be a batch is set aside without a request; links, unfinished and fresh files are left alone; nothing leaves the inbox
+ℹ pass 10
+ℹ fail 1
+## mutation: an unsafe delivery id is used as it is
+✖ a file that cannot be a batch is set aside without a request; links, unfinished and fresh files are left alone; nothing leaves the inbox
+ℹ pass 10
+ℹ fail 1
+## mutation: an oversized file is sent
+ℹ pass 11
+ℹ fail 0
+## mutation: a 200 for another delivery counts as a receipt
+✖ a redirect is not followed, a full rate window ends the run, and an answer that is not a receipt changes nothing
+ℹ pass 10
+ℹ fail 1
+## mutation: a refused token does not end the run
+✖ when the server is off, unreachable or refuses the token, the file stays as it is and is delivered later under the same id
+✖ from the command line: the summary and the exit code; the token comes from the environment only and appears in nothing the bridge writes
+ℹ pass 9
+ℹ fail 2
+## mutation: the lock is ignored
+✖ one bridge per inbox: a second run does nothing while the first holds the lock; a lock left by a process that is gone is taken over
+ℹ pass 10
+ℹ fail 1
+## mutation: the script accepts a token option
+✖ from the command line: the summary and the exit code; the token comes from the environment only and appears in nothing the bridge writes
+ℹ pass 10
+ℹ fail 1
+## mutation: plain http to another host is accepted
+✖ the endpoint must be this service's intake address, over TLS unless it is on this machine
+✖ from the command line: the summary and the exit code; the token comes from the environment only and appears in nothing the bridge writes
+ℹ pass 9
+ℹ fail 2
+## mutation: an oversized file is sent (redone with both size checks removed: the first attempt removed one of two and changed nothing)
+✖ a file that cannot be a batch is set aside without a request; links, unfinished and fresh files are left alone; nothing leaves the inbox
+ℹ pass 10
+ℹ fail 1

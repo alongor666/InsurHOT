@@ -6,7 +6,7 @@ import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
@@ -95,9 +95,9 @@ test("a batch is delivered once, archived with the server's receipt, and a repea
   drop(dir, "morning.json", bytes);
   const first = await run(dir);
   assert.deepEqual([counts(first), exitCodeFor(first)], [[1, 0, 0, 0, 0], 0]);
-  assert.deepEqual([await stored(id), list(dir, "pending"), list(dir, "delivered")], [{ deliveries: 1, items: 1 }, [], [`${id}.json`, `${id}.receipt.json`]]);
+  assert.deepEqual([await stored(id), list(dir, "pending"), list(dir, "delivered")], [{ deliveries: 1, items: 1 }, [], [`${id}.json`]]);
   assert.equal(readFileSync(path.join(dir, "delivered", `${id}.json`), "utf8"), bytes, "archived exactly as written");
-  const receipt = JSON.parse(readFileSync(path.join(dir, "delivered", `${id}.receipt.json`), "utf8"));
+  const receipt = JSON.parse(readFileSync(path.join(dir, "receipts", `${id}.json`), "utf8"));
   assert.deepEqual([receipt.deliveryId, receipt.status, receipt.itemCount, typeof receipt.receivedAt, receipt.producer], [id, "received", 1, "string", "dot"]);
   const [row] = await sql<{ received_at: Date }[]>`SELECT received_at FROM dot_deliveries WHERE delivery_id = ${id}`;
   assert.equal(receipt.receivedAt, row!.received_at.toISOString(), "the receipt carries the server's time of first reception");
@@ -109,7 +109,7 @@ test("a batch is delivered once, archived with the server's receipt, and a repea
   const second = await run(dir);
   assert.deepEqual([counts(second), exitCodeFor(second)], [[0, 2, 0, 0, 0], 0]);
   assert.deepEqual([await stored(id), list(dir, "pending")], [{ deliveries: 1, items: 1 }, []]);
-  const again = JSON.parse(readFileSync(path.join(dir, "delivered", `${id}.receipt.json`), "utf8"));
+  const again = JSON.parse(readFileSync(path.join(dir, "receipts", `${id}.json`), "utf8"));
   assert.deepEqual([again.status, again.receivedAt, again.firstSeenAt], ["duplicate", receipt.receivedAt, receipt.firstSeenAt]);
   assert.equal(readFileSync(path.join(dir, "delivered", `${id}.json`), "utf8"), bytes, "the first archived copy stays");
   const lines = ledger(dir);
@@ -201,6 +201,7 @@ test("when the server is off, unreachable or refuses the token, the file stays a
   const down = await run(dir, { endpoint: `http://127.0.0.1:${deadPort}/api/ingest/dot`, fetchImpl: (...a) => { sent += 1; return fetch(...a); } });
   assert.deepEqual([counts(down), down.stopped, exitCodeFor(down), sent], [[0, 0, 0, 2, 0], "unreachable", 2, 1]);
   untouched();
+  assert.ok(ledger(dir).at(-1)!.error === "unreachable" && !everything(dir).includes(TOKEN), "nothing of the failed request is written down");
 
   // A wrong token: refused, the run stops, the second file is not sent.
   sent = 0;
@@ -218,14 +219,20 @@ test("a redirect is not followed, a full rate window ends the run, and an answer
   let elsewhere = 0;
   const target = http.createServer((_req, res) => { elsewhere += 1; res.end("{}"); });
   await new Promise<void>((r) => target.listen(0, "127.0.0.1", r));
-  let mode: "redirect" | "limited" | "odd" = "redirect";
+  let mode: "redirect" | "limited" | "odd" | "not-ok" | "no-ok" | "failing" = "redirect";
   let hits = 0;
   const front = http.createServer((req, res) => {
     req.resume();
     hits += 1;
     if (mode === "redirect") res.writeHead(307, { location: `http://127.0.0.1:${(target.address() as AddressInfo).port}/api/ingest/dot` }).end();
     else if (mode === "limited") res.writeHead(429, { "content-type": "application/json" }).end('{"ok":false,"error":"rate_limited"}');
-    else res.writeHead(200, { "content-type": "application/json" }).end('{"ok":true,"status":"received","deliveryId":"someone-else"}');
+    else if (mode === "odd") res.writeHead(200, { "content-type": "application/json" }).end('{"ok":true,"status":"received","deliveryId":"someone-else"}');
+    else {
+      // Shaped like this delivery's receipt, but not a success: ok is false or missing, or the status is a 500.
+      const id = `d-${RUN}-redirect${hits % 2 ? "" : "-b"}`;
+      const body = { ...(mode === "no-ok" ? {} : { ok: mode === "failing" }), status: "received", deliveryId: id, receivedAt: "2026-09-30T00:00:00.000Z", firstSeenAt: "2026-09-30T00:00:00.000Z", itemCount: 1 };
+      res.writeHead(mode === "failing" ? 500 : 200, { "content-type": "application/json" }).end(JSON.stringify(body));
+    }
   });
   await new Promise<void>((r) => front.listen(0, "127.0.0.1", r));
   try {
@@ -243,6 +250,12 @@ test("a redirect is not followed, a full rate window ends the run, and an answer
     mode = "odd";
     const odd = await run(dir, { endpoint: at });
     assert.deepEqual([counts(odd), list(dir, "pending"), list(dir, "delivered")], [[0, 0, 0, 2, 0], ["a.json", "b.json"], []], "a 200 that names another delivery is not a receipt");
+    for (const m of ["not-ok", "no-ok", "failing"] as const) {
+      mode = m;
+      hits = 0;
+      const r = await run(dir, { endpoint: at });
+      assert.deepEqual([counts(r), hits, list(dir, "pending"), list(dir, "delivered"), list(dir, "receipts")], [[0, 0, 0, 2, 0], 2, ["a.json", "b.json"], [], []], m);
+    }
   } finally {
     await new Promise((r) => front.close(r));
     await new Promise((r) => target.close(r));
@@ -271,11 +284,102 @@ test("one bridge per inbox: a second run does nothing while the first holds the 
   writeFileSync(path.join(dir, ".lock"), gone);
   const taken = await run(dir);
   assert.deepEqual([counts(taken), existsSync(path.join(dir, ".lock"))], [[1, 0, 0, 0, 0], false]);
+  // A lock file with nothing in it is a holder just starting; one that stayed empty is a leftover.
+  drop(dir, "c.json", batch(`${id}-c`));
+  writeFileSync(path.join(dir, ".lock"), "");
+  assert.equal((await run(dir)).stopped, "locked");
+  utimesSync(path.join(dir, ".lock"), new Date(Date.now() - 60_000), new Date(Date.now() - 60_000));
+  assert.equal((await run(dir)).delivered, 1);
   // Two runs at once: one delivers, the other finds the lock or a duplicate; one batch is stored.
   drop(dir, "b.json", batch(`${id}-b`));
   const both = await Promise.all([run(dir), run(dir)]);
   assert.equal(both[0].delivered + both[1].delivered, 1);
   assert.equal((await stored(`${id}-b`)).deliveries, 1);
+});
+
+test("a file put under the same name while its predecessor is being sent is neither archived as that one nor deleted", async () => {
+  const dir = inbox();
+  const a = `d-${RUN}-swap-a`, b = `d-${RUN}-swap-b`, c = `d-${RUN}-swap-c`;
+  const bytes = (id: string, title?: string) => JSON.stringify(batch(id, title));
+  /** The producer's way of replacing today.json: write a .part, then rename it over the name. */
+  const replace = (content: string) => {
+    drop(dir, "today.json.part", content);
+    renameSync(path.join(dir, "pending", "today.json.part"), path.join(dir, "pending", "today.json"));
+  };
+  const during = (content: string): typeof fetch => {
+    let done = false;
+    return (...args) => { if (!done) { done = true; replace(content); } return fetch(...args); };
+  };
+  const today = () => readFileSync(path.join(dir, "pending", "today.json"), "utf8");
+
+  // First reception of A, with B arriving under the same name meanwhile.
+  drop(dir, "today.json", bytes(a));
+  const first = await run(dir, { fetchImpl: during(bytes(b)) });
+  assert.deepEqual([counts(first), readFileSync(path.join(dir, "delivered", `${a}.json`), "utf8"), today()], [[1, 0, 0, 0, 0], bytes(a), bytes(b)], "A is archived as sent; B still waits");
+  assert.deepEqual([await stored(a), await stored(b)], [{ deliveries: 1, items: 1 }, { deliveries: 0, items: 0 }]);
+
+  // A repeat of A (a duplicate), with C arriving meanwhile: C is not the file to delete.
+  rmSync(path.join(dir, "pending", "today.json"));
+  drop(dir, "today.json", bytes(a));
+  const second = await run(dir, { fetchImpl: during(bytes(c)) });
+  assert.deepEqual([counts(second), today(), readFileSync(path.join(dir, "delivered", `${a}.json`), "utf8")], [[0, 1, 0, 0, 0], bytes(c), bytes(a)]);
+
+  // A refused change of A, with B arriving meanwhile: what was refused is kept from the bytes sent.
+  rmSync(path.join(dir, "pending", "today.json"));
+  drop(dir, "today.json", bytes(a, "changed"));
+  const third = await run(dir, { fetchImpl: during(bytes(b)) });
+  assert.deepEqual([counts(third), today(), readFileSync(path.join(dir, "rejected", "today.json"), "utf8")], [[0, 0, 1, 0, 0], bytes(b), bytes(a, "changed")]);
+
+  // The newcomer is delivered by the next run, as itself.
+  const fourth = await run(dir);
+  assert.deepEqual([counts(fourth), await stored(b), readFileSync(path.join(dir, "delivered", `${b}.json`), "utf8"), list(dir, "pending"), list(dir, ".aside")], [[1, 0, 0, 0, 0], { deliveries: 1, items: 1 }, bytes(b), [], []]);
+});
+
+test("archives, receipts and refusals never write over one another, whatever the ids and file names", async () => {
+  const dir = inbox();
+  // "x" and "x.receipt" are both valid delivery ids.
+  const x = `d-${RUN}-x`, xr = `${x}.receipt`;
+  drop(dir, "1.json", batch(xr));
+  drop(dir, "2.json", batch(x));
+  assert.deepEqual(counts(await run(dir)), [2, 0, 0, 0, 0]);
+  assert.deepEqual([list(dir, "delivered"), list(dir, "receipts")], [[`${x}.json`, `${xr}.json`], [`${x}.json`, `${xr}.json`]]);
+  assert.deepEqual([JSON.parse(readFileSync(path.join(dir, "delivered", `${x}.json`), "utf8")).deliveryId, JSON.parse(readFileSync(path.join(dir, "delivered", `${xr}.json`), "utf8")).deliveryId,
+    JSON.parse(readFileSync(path.join(dir, "receipts", `${x}.json`), "utf8")).deliveryId], [x, xr, x]);
+
+  // A refused file whose own name looks like another refusal's reason file.
+  drop(dir, "a.json.error.json", "first refused file, not JSON");
+  await run(dir);
+  drop(dir, "a.json", "second refused file, not JSON");
+  await run(dir);
+  const refused = list(dir, "rejected");
+  assert.equal(refused.length, 4);
+  assert.equal(readFileSync(path.join(dir, "rejected", "a.json.error.json"), "utf8"), "first refused file, not JSON", "the first refused file is still there, as it was");
+  assert.ok(refused.some((n) => n !== "a.json.error.json" && readFileSync(path.join(dir, "rejected", n), "utf8") === "second refused file, not JSON"));
+});
+
+test("a file that vanishes mid-run, a leftover of a killed run and a second bridge without the lock lose nothing and stop nothing", async () => {
+  const dir = inbox();
+  const id = `d-${RUN}-rough`;
+  drop(dir, "a.json", batch(`${id}-a`));
+  drop(dir, "b.json", batch(`${id}-b`));
+  drop(dir, "c.json", batch(`${id}-c`));
+  // While a.json is being sent, b.json is withdrawn.
+  let first = true;
+  const result = await run(dir, { fetchImpl: (...args) => { if (first) { first = false; unlinkSync(path.join(dir, "pending", "b.json")); } return fetch(...args); } });
+  assert.deepEqual([counts(result), exitCodeFor(result), list(dir, "delivered")], [[2, 0, 0, 0, 0], 0, [`${id}-a.json`, `${id}-c.json`]]);
+
+  // A run that was killed after moving a file aside: the next one puts it back and delivers it.
+  writeFileSync(path.join(dir, ".aside", "4242-0"), JSON.stringify(batch(`${id}-left`)));
+  utimesSync(path.join(dir, ".aside", "4242-0"), new Date(Date.now() - 60_000), new Date(Date.now() - 60_000));
+  assert.deepEqual([counts(await run(dir)), list(dir, ".aside"), (await stored(`${id}-left`)).deliveries], [[1, 0, 0, 0, 0], [], 1]);
+
+  // Two bridges on one inbox with no lock at all: one batch each in the store, every file archived once, nothing refused or left.
+  for (let k = 0; k < 6; k++) drop(dir, `p${k}.json`, batch(`${id}-p${k}`));
+  const both = await Promise.all([run(dir, { skipLock: true }), run(dir, { skipLock: true })]);
+  assert.deepEqual([both[0].rejected + both[1].rejected, both[0].retry + both[1].retry, list(dir, "pending"), list(dir, "rejected"), list(dir, ".aside")], [0, 0, [], [], []]);
+  assert.ok(both[0].delivered + both[1].delivered === 6 && both[0].delivered + both[0].duplicate + both[1].delivered + both[1].duplicate >= 6);
+  const [n] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM dot_deliveries WHERE delivery_id LIKE ${`${id}-p%`}`;
+  assert.deepEqual([n!.n, list(dir, "delivered").filter((f) => f.includes("-p")).length], [6, 6]);
 });
 
 test("from the command line: the summary and the exit code; the token comes from the environment only and appears in nothing the bridge writes", async () => {
@@ -311,5 +415,5 @@ test("from the command line: the summary and the exit code; the token comes from
   // Neither token is in the ledger, the receipts, the error files or what was printed.
   const written = everything(dir) + done.stdout + done.stderr + refused.stdout + refused.stderr;
   assert.ok(written.includes(id) && !written.includes(TOKEN) && !written.includes(wrongToken));
-  assert.deepEqual([lstatSync(path.join(dir, "ledger.jsonl")).mode & 0o777, lstatSync(path.join(dir, "delivered", `${id}.receipt.json`)).mode & 0o777], [0o600, 0o600]);
+  assert.deepEqual([lstatSync(path.join(dir, "ledger.jsonl")).mode & 0o777, lstatSync(path.join(dir, "receipts", `${id}.json`)).mode & 0o777], [0o600, 0o600]);
 });
