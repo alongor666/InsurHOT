@@ -1,0 +1,16 @@
+# Security-only dependency updates; version bumps stay manual so the pinned lockfile changes on purpose.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # Only advisories: ignore every non-security update for every package.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
