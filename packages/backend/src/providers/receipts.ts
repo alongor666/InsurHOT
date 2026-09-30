@@ -8,8 +8,8 @@
 //    caller. ops.recover releases it once after 30 minutes (admin/runs.ts), so a lost answer costs at
 //    most one repeat; after that it waits for the admin. Its money stays reserved either way.
 //
-// Lock order (money.ts): the per-service lock first, then the money calls, and only then writes to an
-// existing attempt row. The three steps below keep to it.
+// Lock order (money.ts): the per-service lock, the receipt row, the money calls, and only then writes
+// to an existing attempt row. Every transaction below that touches a receipt starts at its row.
 import { assertPaidOutboundDisabled } from "../outbound-policy.ts";
 import { sql, type Db } from "../db.ts";
 import { sha256, stableJson } from "../lib/ids.ts";
@@ -144,7 +144,7 @@ export async function checkBudget(tx: Db, service: string): Promise<void> {
 export type PaidClaim =
   | { kind: "reuse" | "busy" | "unknown"; row: ReceiptRow }
   /** The request may be sent: its attempt exists and its worst case is reserved on `price`. */
-  | { kind: "call"; id: number; attemptId: number; price: ApprovedPrice };
+  | { kind: "call"; id: number; attemptId: number; attempt: number; price: ApprovedPrice };
 
 /**
  * Step 1, bookkeeping only: decides whether the logical request is to be sent and, if so, records the
@@ -169,10 +169,11 @@ export async function claimPaidRequest(req: ReceiptRequest): Promise<PaidClaim> 
       if (existing.status === "unknown") return { kind: "unknown", row: existing };
     }
     // A new request, or one that failed (the provider did not take it, or its answer was unusable): a new attempt is allowed.
+    // The count budget speaks first, as it always did: a full window is a reason to wait, a missing price is not.
+    await checkBudget(tx, req.service);
     const price = await approvedPrice(tx, req.service, req.money.priceKey, req.money.baseUrl);
     const amount = req.money.worstCase(price);
     const capability = capabilityFor(req.service, req.purpose, purposes);
-    await checkBudget(tx, req.service);
     let id: number;
     let attempt: number;
     if (existing) {
@@ -191,7 +192,7 @@ export async function claimPaidRequest(req: ReceiptRequest): Promise<PaidClaim> 
     }
     const attemptId = await startAttempt(tx, id, attempt, req);
     await reserveMoney(tx, attemptId, { price, capability, subject: req.subject, amount });
-    return { kind: "call", id, attemptId, price };
+    return { kind: "call", id, attemptId, attempt, price };
   }) as Promise<PaidClaim>;
 }
 
@@ -220,25 +221,44 @@ export function settlementForOutcome(money: MoneySpec, price: ApprovedPrice, out
 
 type CallClaim = Extract<PaidClaim, { kind: "call" }>;
 
-/** Step 3 after a failed call, bookkeeping only: settles the money, then records the failure. */
+/** The receipt row, locked: every transaction on a receipt starts here (lock order, money.ts). */
+const lockReceipt = (tx: Db, id: number) => tx<{ status: string; attempts: number }[]>`SELECT status, attempts FROM receipts WHERE id = ${id} FOR UPDATE`;
+
+/**
+ * Step 3 after a failed call, bookkeeping only: settles the money, then records the failure. The
+ * attempt always gets its outcome; the receipt only while it still waits on this very attempt, so a
+ * failure that arrives late (the receipt went unknown, or a newer attempt is under way) cannot reopen it.
+ */
 export async function failPaidAttempt(claim: CallClaim, error: unknown, latencyMs: number): Promise<void> {
   const status = error instanceof ProviderRejectedError ? "failed" : "unknown";
   // "unknown": the request may have reached the provider (timeout, reset): do not re-send automatically.
   const message = (error instanceof ProviderRejectedError ? error.message : String(error)).slice(0, 2000);
   await sql.begin(async (tx) => {
-    await settleMoney(tx, claim.attemptId, settlementForError(error));
-    await tx`UPDATE receipts SET status = ${status}, error = ${message}, updated_at = now() WHERE id = ${claim.id}`;
-    await tx`UPDATE receipt_attempts SET status = ${status}, error = ${message}, latency_ms = ${latencyMs}, finished_at = now() WHERE id = ${claim.attemptId}`;
+    const [receipt] = await lockReceipt(tx, claim.id);
+    const settled = await settleMoney(tx, claim.attemptId, settlementForError(error));
+    if (receipt && receipt.status === "pending" && receipt.attempts === claim.attempt) {
+      await tx`UPDATE receipts SET status = ${status}, error = ${message}, updated_at = now() WHERE id = ${claim.id}`;
+    }
+    await tx`
+      UPDATE receipt_attempts SET status = ${status}, error = ${message}, latency_ms = ${latencyMs}, finished_at = now(),
+        cost = ${settled.figure}, currency = ${settled.figure === null ? null : claim.price.currency}, cost_basis = ${settled.figure === null ? null : "actual"}
+      WHERE id = ${claim.attemptId}`;
   });
 }
 
-/** Step 3 after an answer, bookkeeping only: settles the money, then stores the raw response. */
+/**
+ * Step 3 after an answer, bookkeeping only: settles the money, then stores the raw response. The cost
+ * written is the figure the ledger took, not one it refused. The receipt takes the answer while it
+ * still waits on this attempt, also when it had gone unknown meanwhile; once a newer attempt is under
+ * way only the attempt row records it.
+ */
 export async function settlePaidAttempt(req: ReceiptRequest, claim: CallClaim, outcome: CallOutcome, latencyMs: number): Promise<{ overrun: boolean; priceSuspended: boolean }> {
   const { settlement, basis } = settlementForOutcome(req.money, claim.price, outcome);
-  const cost = settlement.kind === "actual" ? { amount: settlement.amount, currency: settlement.currency, basis } : null;
   return sql.begin(async (tx) => {
+    const [receipt] = await lockReceipt(tx, claim.id);
     const settled = await settleMoney(tx, claim.attemptId, settlement);
-    await tx`
+    const cost = settled.figure === null ? null : { amount: settled.figure, currency: claim.price.currency, basis };
+    if (receipt && (receipt.status === "pending" || receipt.status === "unknown") && receipt.attempts === claim.attempt) await tx`
       UPDATE receipts SET
         status = 'received',
         response = ${tx.json((outcome.response ?? null) as never)},
@@ -247,6 +267,7 @@ export async function settlePaidAttempt(req: ReceiptRequest, claim: CallClaim, o
         cost = ${cost?.amount ?? null},
         currency = ${cost?.currency ?? null},
         cost_basis = ${cost?.basis ?? null},
+        error = NULL,
         received_at = now(),
         updated_at = now()
       WHERE id = ${claim.id}`;

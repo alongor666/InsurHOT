@@ -10,9 +10,9 @@ import { dajialaMoney, dajialaOutcome } from "@aihot/backend/providers/dajiala";
 import { embeddingsMoney } from "@aihot/backend/providers/embeddings";
 import { jinaMoney } from "@aihot/backend/providers/jina";
 import { chatMoney, MODELS } from "@aihot/backend/providers/llm";
-import { budgetMonth, chatWorstCase, MoneyRefusedError, MonthlyBudgetExhaustedError, reconcileMoneyLedger, type ApprovedPrice } from "@aihot/backend/providers/money";
+import { budgetMonth, chatWorstCase, MoneyRefusedError, MonthlyBudgetExhaustedError, reconcileMoneyLedger, tokenCost, type ApprovedPrice } from "@aihot/backend/providers/money";
 import {
-  BudgetExceededError, claimPaidRequest, failPaidAttempt, ProviderRejectedError, rejectReceivedResponse, settlementForError, settlePaidAttempt,
+  BudgetExceededError, claimPaidRequest, failPaidAttempt, markStalePendingReceipts, ProviderRejectedError, rejectReceivedResponse, settlementForError, settlePaidAttempt,
   type CallOutcome, type MoneySpec, type PaidClaim, type ReceiptRequest,
 } from "@aihot/backend/providers/receipts";
 import { socialdataMoney } from "@aihot/backend/providers/socialdata";
@@ -289,7 +289,96 @@ test("Jina and SocialData: refused without a cap the provider enforces; with one
   await consistent();
 });
 
-test("simultaneous requests of different services never exceed a limit together, and claims, answers and failures do not deadlock", async () => {
+const receiptOf = async (id: number) => ({ ...(await sql<Record<string, unknown>[]>`SELECT status, attempts, cost, cost_basis FROM receipts WHERE id = ${id}`)[0] });
+const makeStale = (id: number) => sql`UPDATE receipts SET updated_at = now() - interval '11 minutes' WHERE id = ${id}`;
+
+test("the cost written is the figure the ledger took; a usage that contradicts itself is no figure", async () => {
+  await verifiedModel();
+  await priceRow("dajiala", "post_history", { per_request: 0.14 });
+  // A provider figure in another currency is not counted, and is not written as the cost either.
+  const mp: ReceiptRequest = { service: "dajiala", purpose: "mp_history", subject: `src-${RUN}`, identity: { f: n++, run: RUN }, money: dajialaMoney("post_history", URL_) };
+  const claim = called(await claimPaidRequest(mp));
+  await settlePaidAttempt(mp, claim, { response: {}, cost: { amount: 0.02, currency: "USD", basis: "actual" } }, 2);
+  const row = await attemptRow(claim.attemptId);
+  assert.deepEqual([row.settled_amount, row.cost, row.cost_basis, row.holds_reservation], [null, null, null, true]);
+  assert.deepEqual([(await receiptOf(claim.id)).cost, (await receiptOf(claim.id)).status], [null, "received"]);
+  // A refusal that reports what it charged is counted and written on the attempt.
+  const charged = { ...mp, identity: { f: n++, run: RUN } };
+  const refusedClaim = called(await claimPaidRequest(charged));
+  await failPaidAttempt(refusedClaim, new ProviderRejectedError("code 101", 101, false, { providerCode: 101, cost: { amount: 0.03, currency: "CNY" } }), 2);
+  const failed = await attemptRow(refusedClaim.attemptId);
+  assert.deepEqual([failed.status, failed.settled_amount, failed.cost, failed.cost_basis, failed.holds_reservation], ["failed", 0.03, 0.03, "actual", true]);
+  // Usage that says less came back in total than went in, or nothing about the output: the reservation stays.
+  const price = { inputPerMtok: 2, outputPerMtok: 8 } as ApprovedPrice;
+  assert.equal(tokenCost(price, { prompt_tokens: 100, total_tokens: 50 }), null);
+  assert.equal(tokenCost(price, { prompt_tokens: 100 }), null);
+  assert.equal(tokenCost(price, { completion_tokens: 10 }), null);
+  assert.equal(tokenCost(price, { prompt_tokens: 100, completion_tokens: 0, total_tokens: 140 }), (100 * 2 + 40 * 8) / 1e6);
+  assert.equal(tokenCost(price, { prompt_tokens: 100, completion_tokens: 10 }), (100 * 2 + 10 * 8) / 1e6);
+  await consistent();
+});
+
+test("an outcome that arrives late cannot reopen a receipt: only the attempt records it once the receipt has moved on", async () => {
+  await verifiedModel();
+  // The placeholder goes stale and unknown; its failure arrives afterwards.
+  const a = chat();
+  const first = called(await claimPaidRequest(a.req));
+  await makeStale(first.id);
+  assert.equal(await markStalePendingReceipts() >= 1, true);
+  assert.equal((await receiptOf(first.id)).status, "unknown");
+  assert.equal((await attemptRow(first.attemptId)).holds_reservation, true, "unknown keeps its money");
+  await failPaidAttempt(first, new ProviderRejectedError("HTTP 500", 500, true), 1);
+  assert.equal((await receiptOf(first.id)).status, "unknown", "a late 500 does not turn unknown into a free retry");
+  assert.equal((await claimPaidRequest(a.req)).kind, "unknown");
+  // The answer itself arriving late is taken: it was paid for.
+  await settlePaidAttempt(a.req, first, { response: { late: true }, usage: { prompt_tokens: 10, completion_tokens: 5 } }, 1);
+  assert.deepEqual([(await receiptOf(first.id)).status, (await attemptRow(first.attemptId)).status], ["received", "received"]);
+  assert.equal((await claimPaidRequest(a.req)).kind, "reuse");
+
+  // Released by hand while the old call was still out; a newer attempt is under way when the old one fails.
+  const b = chat();
+  const old = called(await claimPaidRequest(b.req));
+  await sql`UPDATE receipts SET status = 'failed', updated_at = now() WHERE id = ${old.id}`;
+  const newer = called(await claimPaidRequest(b.req));
+  assert.deepEqual([newer.id, newer.attempt], [old.id, 2]);
+  await failPaidAttempt(old, new ProviderRejectedError("HTTP 500", 500, true), 1);
+  assert.deepEqual([(await receiptOf(old.id)).status, (await attemptRow(old.attemptId)).status], ["pending", "failed"]);
+  assert.equal((await claimPaidRequest(b.req)).kind, "busy", "one request is never in flight twice");
+  await settlePaidAttempt(b.req, old, { response: { old: true }, usage: { prompt_tokens: 10, completion_tokens: 5 } }, 1);
+  assert.equal((await receiptOf(old.id)).status, "pending", "the newer attempt still owns the receipt");
+  await settlePaidAttempt(b.req, newer, { response: { newer: true }, usage: { prompt_tokens: 10, completion_tokens: 5 } }, 1);
+  assert.equal((await receiptOf(old.id)).status, "received");
+  await consistent();
+});
+
+test("late settlements do not deadlock with the stale sweep or with a retry of the same receipt", async () => {
+  await verifiedModel();
+  const errors: string[] = [];
+  const note = (results: PromiseSettledResult<unknown>[]) => { for (const r of results) if (r.status === "rejected") errors.push(String(r.reason)); };
+  for (let round = 0; round < 12; round++) {
+    // A stale placeholder: its answer and the sweep that marks it unknown at the same moment.
+    const stale = chat();
+    const claim = called(await claimPaidRequest(stale.req));
+    await makeStale(claim.id);
+    note(await Promise.allSettled([
+      settlePaidAttempt(stale.req, claim, { response: {}, usage: { prompt_tokens: 10, completion_tokens: 5 } }, 1),
+      markStalePendingReceipts(),
+    ]));
+    // A receipt released while its call was out: the late outcome and the retry's claim at the same moment.
+    const released = chat();
+    const out = called(await claimPaidRequest(released.req));
+    await sql`UPDATE receipts SET status = 'failed', updated_at = now() WHERE id = ${out.id}`;
+    note(await Promise.allSettled([
+      round % 2 ? settlePaidAttempt(released.req, out, { response: {}, usage: { prompt_tokens: 10, completion_tokens: 5 } }, 1)
+        : failPaidAttempt(out, new ProviderRejectedError("HTTP 502", 502, true), 1),
+      claimPaidRequest(released.req),
+    ]));
+  }
+  assert.deepEqual(errors, []);
+  await consistent();
+});
+
+test("simultaneous requests under one capability limit pass exactly as many as fit; claims, answers and failures at once do not deadlock", async () => {
   const model = `mt-${RUN}`;
   await priceRow(LLM, model, { input_per_mtok: 2, output_per_mtok: 8, output_cap_includes_reasoning: true });
   await priceRow("dajiala", "post_history", { per_request: 0.14 });
@@ -316,5 +405,31 @@ test("simultaneous requests of different services never exceed a limit together,
   ];
   const mixed = await Promise.allSettled(work);
   assert.deepEqual(mixed.filter((r) => r.status === "rejected").map((r) => String((r as PromiseRejectedResult).reason)), []);
+  await consistent();
+});
+
+test("simultaneous requests of two services share the global limit and never exceed it together", async () => {
+  const model = `mg-${RUN}`;
+  await priceRow(LLM, model, { input_per_mtok: 2, output_per_mtok: 8, output_cap_includes_reasoning: true });
+  await priceRow("dajiala", "post_history", { per_request: 0.14 });
+  const before = await used("global", "");
+  const room = 0.5;
+  await limit("global", "", Math.round((before + room) * 1e6) / 1e6);
+  try {
+    const chats = Array.from({ length: 12 }, (_, k) => chat({ model, subject: `article:${RUN}g${k}@1` }).req);
+    const mps = Array.from({ length: 8 }, (_, k): ReceiptRequest =>
+      ({ service: "dajiala", purpose: "mp_history", subject: `src-${RUN}`, identity: { g: k, run: RUN }, money: dajialaMoney("post_history", URL_) }));
+    const results = await Promise.allSettled([...chats, ...mps].map((req) => claimPaidRequest(req)));
+    const taken = (await used("global", "")) - before;
+    // Eight Dajiala requests alone would take 1.12: some were refused, all of them on the global row, and what passed fits.
+    assert.ok(taken <= room + 1e-9, `took ${taken}`);
+    const rejected = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+    assert.ok(rejected.length >= 5, `rejected ${rejected.length}`);
+    for (const r of rejected) assert.ok(r.reason instanceof MonthlyBudgetExhaustedError && r.reason.scope === "global", String(r.reason));
+    // Nothing that was refused could still have fitted when it was refused: the smallest request no longer fits now.
+    assert.ok(results.some((r) => r.status === "fulfilled"));
+  } finally {
+    await limit("global", "", 100000);
+  }
   await consistent();
 });

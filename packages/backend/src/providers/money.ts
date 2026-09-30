@@ -8,11 +8,15 @@
 // 4. Usage lives in ledger rows changed by relative increments in the same transaction as the attempt.
 //
 // Lock order, the same for reserving and settling: the global money lock, then the attempt row, then
-// the ledger rows in one fixed order. Two rules follow for every transaction that calls in here:
+// the ledger rows in one fixed order. Three rules follow for every transaction that calls in here:
 //   - a per-service budget lock (receipts.ts) is taken before the first call, never after one;
+//   - a transaction that touches the attempt's receipt row locks that row before the first call
+//     (SELECT ... FOR UPDATE), never after one: claiming and marking a receipt unknown both start
+//     at the receipt row, so a settlement that reached it last would wait in a cycle with them;
 //   - an existing receipt_attempts row is written only after the money calls, or after lockMoney(tx)
 //     has been taken first. A transaction that updates an attempt and then settles it waits for the
 //     global lock while holding the row, and deadlocks with one that holds the lock and wants the row.
+// In full: per-service lock, receipt row, global money lock, attempt row, ledger rows.
 //
 // Nothing here opens the paid lock (outbound-policy.ts): with empty tables everything is refused.
 import { sql, type Db } from "../db.ts";
@@ -282,9 +286,10 @@ export function tokenCost(price: ApprovedPrice, usage: Record<string, unknown> |
   if (!usage || price.inputPerMtok === null) return null;
   const prompt = count(usage.prompt_tokens), completion = count(usage.completion_tokens), total = count(usage.total_tokens);
   if (prompt === null) return null;
+  // A usage that does not say how much came out, or contradicts itself, tells nothing: the reservation stays.
+  if ((completion === null && total === null) || (total !== null && total < prompt)) return null;
   const output = Math.max(completion ?? 0, total !== null ? total - prompt : 0);
   if (output > 0 && price.outputPerMtok === null) return null;
-  if (completion === null && total === null) return null;
   return ceilMicro((prompt * price.inputPerMtok + output * (price.outputPerMtok ?? 0)) / 1e6);
 }
 
@@ -386,6 +391,8 @@ export interface SettlementResult {
   overrun: boolean;
   /** After an overrun: whether the price row is now suspended. False means the row is gone, which the caller must alert on. */
   priceSuspended: boolean;
+  /** The figure this settlement brought and the ledger took, in the reservation's currency; null when there was none or it could not be counted. */
+  figure: number | null;
 }
 
 /**
@@ -403,14 +410,14 @@ export async function settleMoney(tx: Db, attemptId: number, settlement: Settlem
            reserved_amount, reserved_currency, settled_amount, holds_reservation
     FROM receipt_attempts WHERE id = ${attemptId} FOR UPDATE`;
   if (!a) throw new Error(`Attempt ${attemptId} does not exist`);
-  if (a.reserved_amount === null || !a.capability || !a.reserved_currency || !a.budget_month) return { counted: 0, overrun: false, priceSuspended: false };
+  if (a.reserved_amount === null || !a.capability || !a.reserved_currency || !a.budget_month) return { counted: 0, overrun: false, priceSuspended: false, figure: null };
   const before = a.holds_reservation ? a.settled_amount ?? a.reserved_amount : 0;
   const rows = ledgerRows(a.capability, a.subject_keys);
 
   if (settlement.kind === "release") {
     await tx`UPDATE receipt_attempts SET holds_reservation = false, settled_amount = 0 WHERE id = ${attemptId}`;
     await addToLedger(tx, rows, a.reserved_currency, a.budget_month, -before);
-    return { counted: 0, overrun: false, priceSuspended: false };
+    return { counted: 0, overrun: false, priceSuspended: false, figure: null };
   }
   // A figure in another currency cannot be counted against this currency's limits: the reservation stays.
   const figure = settlement.kind === "actual" && settlement.currency === a.reserved_currency && Number.isFinite(settlement.amount) && settlement.amount >= 0
@@ -432,7 +439,7 @@ export async function settleMoney(tx: Db, attemptId: number, settlement: Settlem
       WHERE service = ${a.price_service} AND model = ${a.price_key} RETURNING true AS suspended`;
     priceSuspended = Boolean(row?.suspended);
   }
-  return { counted, overrun, priceSuspended };
+  return { counted, overrun, priceSuspended, figure };
 }
 
 export interface LedgerMismatch { scope: string; key: string; currency: string; month: string; ledger: number; attempts: number }
