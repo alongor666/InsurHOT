@@ -1,20 +1,35 @@
-# brand literals in public outputs after step 1 (main 3c9591c → this branch), local built site
+# brand literals in public outputs after step 1 (review round 1 fixes included), local built site
+# pattern: myhot|aihot[a-z_.-]*|AI (日报|周报|月报|圈|动态|行业)|AI 行业
 /:  1 aihot-theme 
-/about:  2 AIHOT 1 aihot-theme 
+/all:  1 aihot-theme 
+/about:  1 aihot-theme 
 /agent:  1 aihot-theme 
 /privacy:  1 aihot-theme 
 /terms:  1 aihot-theme 
 /hot:  1 aihot-theme 
 /daily:  1 aihot-theme 
+/weekly:  1 aihot-theme 
+/monthly:  1 aihot-theme 
+/daily/archive:  1 aihot-theme 
+/topics:  4 AI 动态 2 AI 行业 1 aihot-theme 
 /llms.txt: 
 /feed.xml: 
 /feed/all.xml: 
 /openapi-v1.json: 
 /manifest.webmanifest: 
+/robots.txt: 
+/sitemap.xml: 
 /api/v1/items: 
+/api/site/timeline: 
+
+titles:
+/daily: <title>保险日报 · InsurHOT</title>
+/weekly: <title>保险周报 · InsurHOT</title>
+/monthly: <title>保险月报 · InsurHOT</title>
+/hot: <title>保险热点榜 · InsurHOT</title>
 
 mcp tools/list:
 "name":"insurhot_get_latest" "name":"insurhot_search" "name":"insurhot_get_hot_topics" "name":"insurhot_get_story" "name":"insurhot_get_daily" 
 
 about page acknowledgement:
-本站基于开源项目 AIHOT（MIT 许可）构建，并按本站的行业与规则改造；上游的许可与署名保留在仓库的 LICENSE 与 NOTICE 中。AIHOT 的名称与标志不随代码授权，本站不
+本站基于开源项目 AIHOT（MIT 许可）构建，并按本站的行业与规则改造；上游的许可与署名保留在仓库的 LICENSE 与 NOTICE 中。AIHOT 的名称与标志不随代码授权，不在本站的对外品牌中使用。

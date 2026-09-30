@@ -68,7 +68,7 @@ export const ABOUT = {
     feishu?: { title: string; note: string };
   },
   /** 开源致谢（选填）：显示在关于页底部；这是许可要求的署名保留处，页脚不再出现。 */
-  acknowledgement: "本站基于开源项目 AIHOT（MIT 许可）构建，并按本站的行业与规则改造；上游的许可与署名保留在仓库的 LICENSE 与 NOTICE 中。AIHOT 的名称与标志不随代码授权，本站不使用它们。" as string | null,
+  acknowledgement: "本站基于开源项目 AIHOT（MIT 许可）构建，并按本站的行业与规则改造；上游的许可与署名保留在仓库的 LICENSE 与 NOTICE 中。AIHOT 的名称与标志不随代码授权，不在本站的对外品牌中使用。" as string | null,
   /** 页面底部的版权与下架说明（结尾会接“反馈页”的链接）。 */
   copyright: `${SITE.name} 是聚合摘要和阅读索引，原文版权归各来源所有。如果你是来源方，希望更正、下架或调整展示方式，可以通过`,
 } as const;
