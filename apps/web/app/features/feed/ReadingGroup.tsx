@@ -28,7 +28,7 @@ interface Saved {
   open: boolean;
   paged: Paged<unknown> & { scope: string };
 }
-const groupsCache = sessionCache<{ savedAt: number; groups: Record<string, Saved> }>("aihot:groups:", 30 * 60 * 1000);
+const groupsCache = sessionCache<{ savedAt: number; groups: Record<string, Saved> }>("insurhot:groups:", 30 * 60 * 1000);
 
 function stored(entry: string): Record<string, Saved> {
   return groupsCache.read(entry)?.groups ?? {};

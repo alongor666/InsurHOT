@@ -76,16 +76,38 @@ async function upload(s: Store, key: string, file: string, sha: string, size: nu
   if (!res.ok) throw new Error(`backup upload ${key}: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
 }
 
+/** The two kinds of local copy, each under its current name and the name it had before ADR-003 step 2: both are pruned. */
+const LOCAL_KINDS: Array<{ keep: number; prefixes: string[] }> = [
+  { keep: KEEP_LOCAL, prefixes: ["insurhot-2", "aihot-2"] },
+  { keep: KEEP_LOCAL, prefixes: ["insurhot-files-", "aihot-files-"] },
+];
+
+/** Local copies: the newest few of each kind stay, counted across the old and the new file name prefix. */
+export async function pruneLocalBackups(dir: string): Promise<string[]> {
+  const removed: string[] = [];
+  const names = await readdir(dir);
+  for (const kind of LOCAL_KINDS) {
+    // The stamp follows the prefix; sorting on the stamp alone keeps old and new names in one order.
+    const stampOf = (f: string) => f.slice(kind.prefixes.find((p) => f.startsWith(p))!.length);
+    const list = names.filter((f) => kind.prefixes.some((p) => f.startsWith(p))).sort((a, b) => stampOf(b).localeCompare(stampOf(a)));
+    for (const f of list.slice(kind.keep)) {
+      await rm(path.join(dir, f), { force: true });
+      removed.push(f);
+    }
+  }
+  return removed;
+}
+
 export async function runBackup(now = new Date()) {
   const s = store();
   const dir = path.join(config.dataDir, "backups");
   await mkdir(dir, { recursive: true });
   const stamp = now.toISOString().slice(0, 16).replace(/[-:T]/g, "");
-  const dump = path.join(dir, `aihot-${stamp}.dump`);
+  const dump = path.join(dir, `insurhot-${stamp}.dump`);
   await run("pg_dump", ["--format=custom", "--compress=6", "--no-owner", "--file", dump, config.databaseUrl], { maxBuffer: 16 * 1024 * 1024 });
   // Verify before shipping: the archive must list cleanly.
   await run("pg_restore", ["--list", dump], { maxBuffer: 64 * 1024 * 1024 });
-  const files = path.join(dir, `aihot-files-${stamp}.tar.gz`);
+  const files = path.join(dir, `insurhot-files-${stamp}.tar.gz`);
   // An empty archive only when there is nothing to keep. A failure to read or pack existing files is
   // tried once more and otherwise reported: the database dump still ships, but the run fails.
   const kept: string[] = [];
@@ -115,11 +137,7 @@ export async function runBackup(now = new Date()) {
       out.push({ key: s ? key : `local-only:${path.basename(file)}`, bytes: size, sha256: sha });
     }
   }
-  // Local copies: keep the newest few of each kind.
-  for (const kind of ["aihot-2", "aihot-files-"]) {
-    const list = (await readdir(dir)).filter((f) => f.startsWith(kind)).sort().reverse();
-    for (const f of list.slice(KEEP_LOCAL)) await rm(path.join(dir, f), { force: true });
-  }
+  await pruneLocalBackups(dir);
   const summary = { at: now.toISOString(), uploaded: !!s && !filesError, objects: out, ...(filesError ? { filesError } : {}) };
   await sql`INSERT INTO settings (key, value, updated_by) VALUES ('backup.last', ${sql.json(summary as never)}, 'backup')
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;

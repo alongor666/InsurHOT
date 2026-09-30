@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   AIHOT design tokens — the look of the original site: warm off-white paper,
+   Design tokens — the look of the upstream site (see NOTICE): warm off-white paper,
    ink text, one teal accent (cyan in dark), hairline borders, no gradients.
    Components use the semantic names below; values change per theme only.
    --------------------------------------------------------------------------- */
@@ -323,38 +323,38 @@
 }
 
 /* Enter/leave keyframes for components/ui/Presence.tsx; --anim-ms overrides a default length. */
-@keyframes aihot-collapse-in { from { grid-template-rows: 0fr; opacity: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
-@keyframes aihot-collapse-out { from { grid-template-rows: 1fr; opacity: 1; } to { grid-template-rows: 0fr; opacity: 0; } }
-@keyframes aihot-fade-in { from { opacity: 0; } }
-@keyframes aihot-fade-out { to { opacity: 0; } }
-@keyframes aihot-drop-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
-@keyframes aihot-drop-out { to { opacity: 0; transform: translateY(-4px) scale(0.98); } }
-@keyframes aihot-notice-in { from { opacity: 0; transform: translateY(-6px); } }
-@keyframes aihot-zoom-in { from { transform: scale(0.96); } }
-@keyframes aihot-zoom-out { to { transform: scale(0.98); } }
-@keyframes aihot-sheet-in { from { transform: translateY(100%); } }
-@keyframes aihot-sheet-out { to { transform: translateY(100%); } }
-@keyframes aihot-slide-in-x { from { opacity: 0; transform: translateX(10px); } }
-@keyframes aihot-swap-in { from { opacity: 0; transform: scale(0.7); } }
-@keyframes aihot-bump { from { transform: scale(0.7); } 55% { transform: scale(1.08); } to { transform: scale(1); } }
-@keyframes aihot-pop-in { from { opacity: 0; transform: scale(0.6); } 60% { opacity: 1; transform: scale(1.05); } to { transform: scale(1); } }
-@keyframes aihot-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
-.anim-collapse-in { animation: aihot-collapse-in var(--anim-ms, 240ms) var(--ease-out-quart) both; }
-.anim-collapse-out { animation: aihot-collapse-out var(--anim-ms, 240ms) var(--ease-out-quart) both; }
-.anim-fade-in { animation: aihot-fade-in var(--anim-ms, 160ms) ease-out both; }
-.anim-fade-out { animation: aihot-fade-out var(--anim-ms, 160ms) ease-in both; }
-.anim-drop-in { animation: aihot-drop-in 140ms var(--ease-out-quart) both; }
-.anim-drop-out { animation: aihot-drop-out 140ms ease-in both; }
-.anim-notice-in { animation: aihot-notice-in 200ms var(--ease-out-quart) both; }
-.anim-zoom-in { animation: aihot-zoom-in 180ms var(--ease-out-quart) both; }
-.anim-zoom-out, .anim-fade-out > .lightbox-img { animation: aihot-zoom-out 160ms ease-in both; }
-.anim-sheet-in { animation: aihot-sheet-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-.anim-sheet-out, .anim-fade-out > .poster-sheet { animation: aihot-sheet-out 220ms cubic-bezier(0.4, 0, 1, 1) both; }
-.anim-slide-in-x { animation: aihot-slide-in-x 160ms var(--ease-out-quart) both; }
-.anim-swap-in { animation: aihot-swap-in 120ms var(--ease-out-quart) both; }
-.anim-bump { animation: aihot-bump 320ms var(--ease-out-quart) both; }
-.anim-pop-in { animation: aihot-pop-in 460ms var(--ease-out-quart) both; }
-.anim-draw { stroke-dasharray: 1; animation: aihot-draw 900ms var(--ease-out-quart) both; }
+@keyframes insurhot-collapse-in { from { grid-template-rows: 0fr; opacity: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
+@keyframes insurhot-collapse-out { from { grid-template-rows: 1fr; opacity: 1; } to { grid-template-rows: 0fr; opacity: 0; } }
+@keyframes insurhot-fade-in { from { opacity: 0; } }
+@keyframes insurhot-fade-out { to { opacity: 0; } }
+@keyframes insurhot-drop-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
+@keyframes insurhot-drop-out { to { opacity: 0; transform: translateY(-4px) scale(0.98); } }
+@keyframes insurhot-notice-in { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes insurhot-zoom-in { from { transform: scale(0.96); } }
+@keyframes insurhot-zoom-out { to { transform: scale(0.98); } }
+@keyframes insurhot-sheet-in { from { transform: translateY(100%); } }
+@keyframes insurhot-sheet-out { to { transform: translateY(100%); } }
+@keyframes insurhot-slide-in-x { from { opacity: 0; transform: translateX(10px); } }
+@keyframes insurhot-swap-in { from { opacity: 0; transform: scale(0.7); } }
+@keyframes insurhot-bump { from { transform: scale(0.7); } 55% { transform: scale(1.08); } to { transform: scale(1); } }
+@keyframes insurhot-pop-in { from { opacity: 0; transform: scale(0.6); } 60% { opacity: 1; transform: scale(1.05); } to { transform: scale(1); } }
+@keyframes insurhot-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.anim-collapse-in { animation: insurhot-collapse-in var(--anim-ms, 240ms) var(--ease-out-quart) both; }
+.anim-collapse-out { animation: insurhot-collapse-out var(--anim-ms, 240ms) var(--ease-out-quart) both; }
+.anim-fade-in { animation: insurhot-fade-in var(--anim-ms, 160ms) ease-out both; }
+.anim-fade-out { animation: insurhot-fade-out var(--anim-ms, 160ms) ease-in both; }
+.anim-drop-in { animation: insurhot-drop-in 140ms var(--ease-out-quart) both; }
+.anim-drop-out { animation: insurhot-drop-out 140ms ease-in both; }
+.anim-notice-in { animation: insurhot-notice-in 200ms var(--ease-out-quart) both; }
+.anim-zoom-in { animation: insurhot-zoom-in 180ms var(--ease-out-quart) both; }
+.anim-zoom-out, .anim-fade-out > .lightbox-img { animation: insurhot-zoom-out 160ms ease-in both; }
+.anim-sheet-in { animation: insurhot-sheet-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-sheet-out, .anim-fade-out > .poster-sheet { animation: insurhot-sheet-out 220ms cubic-bezier(0.4, 0, 1, 1) both; }
+.anim-slide-in-x { animation: insurhot-slide-in-x 160ms var(--ease-out-quart) both; }
+.anim-swap-in { animation: insurhot-swap-in 120ms var(--ease-out-quart) both; }
+.anim-bump { animation: insurhot-bump 320ms var(--ease-out-quart) both; }
+.anim-pop-in { animation: insurhot-pop-in 460ms var(--ease-out-quart) both; }
+.anim-draw { stroke-dasharray: 1; animation: insurhot-draw 900ms var(--ease-out-quart) both; }
 
 /* Cross-fade between pages; the theme switch fades the whole document. */
 ::view-transition-old(root),

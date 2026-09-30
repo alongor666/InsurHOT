@@ -3,11 +3,11 @@
 import { useSyncExternalStore } from "react";
 
 export const KEYS = {
-  starred: "aihot-starred-items",
-  read: "aihot-read-items",
-  theme: "aihot-theme",
-  changelogSeen: "aihot-changelog-seen-version",
-  feedbackDraft: "aihot-feedback-draft-v1",
+  starred: "insurhot-starred-items",
+  read: "insurhot-read-items",
+  theme: "insurhot-theme",
+  changelogSeen: "insurhot-changelog-seen-version",
+  feedbackDraft: "insurhot-feedback-draft-v1",
 } as const;
 
 export const STARRED_LIMIT = 500;

@@ -11,7 +11,7 @@ export function registerMedia(app: FastifyInstance) {
     // A caching proxy (nginx auth_request) can check every request with this HEAD sub-request before it reads its image cache (keyed
     // by url and mode only): signature only, no upstream fetch. 401 = malformed query, 403 = bad or
     // expired signature; a valid answer may be cached for the rest of the signature's life.
-    if (req.method === "HEAD" && req.headers["x-aihot-img-proxy-auth"] === "1") {
+    if (req.method === "HEAD" && req.headers["x-insurhot-img-proxy-auth"] === "1") {
       if (!verdict.ok) {
         const malformed = verdict.reason === "missing" || verdict.reason === "bad-url";
         return reply.code(malformed ? 401 : 403).header("Cache-Control", "no-store").header("X-Img-Proxy-Sig", verdict.reason === "expired" ? "expired" : "invalid").send();

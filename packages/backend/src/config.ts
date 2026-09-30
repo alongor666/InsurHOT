@@ -35,7 +35,7 @@ function bool(name: string, fallback: boolean): boolean {
 
 
 export const config = {
-  databaseUrl: str("DATABASE_URL", "postgres://127.0.0.1:5432/aihot"),
+  databaseUrl: str("DATABASE_URL", "postgres://127.0.0.1:5432/insurhot"),
   apiPort: int("API_PORT", 3001),
   webPort: int("WEB_PORT", 3000),
   apiBaseUrl: str("API_BASE_URL", "http://127.0.0.1:3001"),
