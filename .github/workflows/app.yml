@@ -121,11 +121,11 @@ jobs:
             test "$state" = "running restarts=0"
           done
           # The setup service migrated and seeded: every migration is recorded and the demo sources are there.
-          recorded="$(docker compose exec -T db psql -U aihot -d aihot -Atc 'select count(*) from schema_migrations')"
+          recorded="$(docker compose exec -T db psql -U insurhot -d insurhot -Atc 'select count(*) from schema_migrations')"
           files="$(ls database/migrations/*.sql | wc -l | tr -d ' ')"
           echo "migrations recorded: $recorded, migration files: $files"
           test "$recorded" = "$files"
-          seeded="$(docker compose exec -T db psql -U aihot -d aihot -Atc 'select count(*) from sources')"
+          seeded="$(docker compose exec -T db psql -U insurhot -d insurhot -Atc 'select count(*) from sources')"
           listed="$(node -e 'console.log(JSON.parse(require("fs").readFileSync("industry/sources.json","utf8")).sources.length)')"
           echo "sources in the database: $seeded, in industry/sources.json: $listed"
           test "$seeded" = "$listed"
