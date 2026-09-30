@@ -25,7 +25,7 @@ export function assertOutboundEnabled(purpose: OutboundPurpose): void {
 }
 
 /** No environment bypass: count budgets cannot authorize spending before M0.3b monetary controls. */
-export function assertPaidOutboundDisabled(): never {
+export function assertPaidOutboundDisabled(): void {
   throw new PaidOutboundDisabledError("Paid outbound disabled until M0.3b monetary hard limits, approved prices and atomic reservations are implemented");
 }
 
