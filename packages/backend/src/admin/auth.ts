@@ -1,3 +1,4 @@
+import { outboundFetch } from "../outbound-policy.ts";
 // Admin identity: the admin password (ADMIN_PASSWORD), or optionally Feishu OAuth with an allowlist of
 // union_ids / emails; opaque sessions stored hashed, and an audit trail for every manual change.
 // Development may impersonate an admin with DEV_AUTH_ROLE=admin; production refuses to start with it.
@@ -92,7 +93,7 @@ async function feishuUser(code: string): Promise<FeishuUser> {
   const appId = credential("integrations", "FEISHU_LOGIN_APP_ID");
   const appSecret = credential("integrations", "FEISHU_LOGIN_APP_SECRET");
   if (!appId || !appSecret) throw new Error("Feishu login app is not configured");
-  const tokenRes = await fetch("https://passport.feishu.cn/suite/passport/oauth/token", {
+  const tokenRes = await outboundFetch("feishuAuth", "https://passport.feishu.cn/suite/passport/oauth/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "authorization_code", client_id: appId, client_secret: appSecret, code, redirect_uri: CALLBACK_URL }),
@@ -100,7 +101,7 @@ async function feishuUser(code: string): Promise<FeishuUser> {
   });
   const token = (await tokenRes.json()) as { access_token?: string; error?: string };
   if (!token.access_token) throw new Error(`Feishu token exchange failed: ${token.error ?? tokenRes.status}`);
-  const userRes = await fetch("https://passport.feishu.cn/suite/passport/oauth/userinfo", {
+  const userRes = await outboundFetch("feishuAuth", "https://passport.feishu.cn/suite/passport/oauth/userinfo", {
     headers: { authorization: `Bearer ${token.access_token}` },
     signal: AbortSignal.timeout(15_000),
   });

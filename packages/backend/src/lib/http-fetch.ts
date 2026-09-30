@@ -1,4 +1,5 @@
 // Outbound HTTP for collectors, the image proxy and the paid APIs: SSRF guard, routing, limits.
+import { assertOutboundEnabled } from "../outbound-policy.ts";
 import net from "node:net";
 import { addAbortListener } from "node:events";
 import { Agent, ProxyAgent, fetch as undiciFetch, type Dispatcher } from "undici";
@@ -60,6 +61,7 @@ export interface GuardedResponse {
 export const DEFAULT_UA = `Mozilla/5.0 (compatible; ${SITE.crawlerName}/1.0; +${config.siteUrl}/about)`;
 
 export async function guardedFetch(input: string, opts: GuardedFetchOptions = {}): Promise<GuardedResponse> {
+  assertOutboundEnabled("collect");
   // One budget includes DNS, every redirect and the body. Restarting it at each hop allowed a
   // nominal 20 s image request to occupy the API for minutes.
   const signal = AbortSignal.timeout(opts.timeoutMs ?? 20_000);
@@ -71,6 +73,7 @@ export async function guardedFetch(input: string, opts: GuardedFetchOptions = {}
   const maxRedirects = opts.maxRedirects ?? 5;
   const maxBytes = opts.maxBytes ?? 8 * 1024 * 1024;
   for (let hop = 0; ; hop++) {
+    assertOutboundEnabled("collect");
     const res = await undiciFetch(url, {
       method: opts.method ?? "GET",
       headers: { "user-agent": DEFAULT_UA, "accept-language": "zh-CN,zh;q=0.9,en;q=0.8", ...(opts.headers ?? {}) },

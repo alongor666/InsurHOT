@@ -6,6 +6,7 @@
 // 4. A request whose outcome is unknown (timeout after sending, crash mid-flight) is not re-sent by the
 //    caller. ops.recover releases it once after 30 minutes (admin/runs.ts), so a lost answer costs at
 //    most one repeat; after that it waits for the admin.
+import { assertPaidOutboundDisabled } from "../outbound-policy.ts";
 import { sql, type Db } from "../db.ts";
 import { sha256, stableJson } from "../lib/ids.ts";
 
@@ -81,10 +82,10 @@ interface ReceiptRow {
   updated_at: Date;
 }
 
-async function checkBudget(tx: Db, service: string): Promise<void> {
+export async function checkBudget(tx: Db, service: string): Promise<void> {
   const [budget] = await tx<{ per_minute: number; per_hour: number; per_day: number }[]>`
     SELECT per_minute, per_hour, per_day FROM budgets WHERE service = ${service}`;
-  if (!budget) return; // default rows come with the migrations; a service an operator removed is unlimited
+  if (!budget) throw new BudgetExceededError(service, "missing budget", 3600);
   // Every request sent counts, retries of the same logical request included.
   const [counts] = await tx<{ minute: number; hour: number; day: number }[]>`
     SELECT
@@ -107,6 +108,7 @@ async function checkBudget(tx: Db, service: string): Promise<void> {
  * The caller parses the response and commits business results, then calls completeReceipt.
  */
 export async function paidRequest(req: ReceiptRequest, call: () => Promise<CallOutcome>): Promise<ReceiptResult> {
+  assertPaidOutboundDisabled();
   const logicalKey = logicalKeyFor(req);
 
   const claimed = await sql.begin(async (tx) => {

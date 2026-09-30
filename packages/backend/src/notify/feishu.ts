@@ -1,3 +1,4 @@
+import { outboundFetch, explicitlyEnabled } from "../outbound-policy.ts";
 // Feishu delivery. Two separate apps: the login app (admin OAuth) and the message app (internal
 // feedback chat, operations alert chat, image upload). Content groups use custom bot webhooks.
 // Alerts and feedback never go to content groups, and content never goes to internal chats.
@@ -10,7 +11,7 @@ import { sql } from "../db.ts";
 
 const API = "https://open.feishu.cn/open-apis";
 
-export const feishuInternalEnabled = () => process.env.FEISHU_INTERNAL_ENABLED === "true";
+export const feishuInternalEnabled = () => explicitlyEnabled("FEISHU_INTERNAL_ENABLED");
 
 let tokenCache: { token: string; expires: number } | null = null;
 
@@ -19,7 +20,7 @@ async function tenantToken(): Promise<string> {
   const appId = credential("integrations", "FEISHU_APP_ID");
   const appSecret = credential("integrations", "FEISHU_APP_SECRET");
   if (!appId || !appSecret) throw new Error("Feishu message app is not configured");
-  const res = await fetch(`${API}/auth/v3/tenant_access_token/internal`, {
+  const res = await outboundFetch("feishuInternal", `${API}/auth/v3/tenant_access_token/internal`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
@@ -35,14 +36,14 @@ async function uploadImage(data: Buffer, filename: string): Promise<string> {
   const form = new FormData();
   form.set("image_type", "message");
   form.set("image", new Blob([new Uint8Array(data)]), filename);
-  const res = await fetch(`${API}/im/v1/images`, { method: "POST", headers: { authorization: `Bearer ${await tenantToken()}` }, body: form, signal: AbortSignal.timeout(30_000) });
+  const res = await outboundFetch("feishuInternal", `${API}/im/v1/images`, { method: "POST", headers: { authorization: `Bearer ${await tenantToken()}` }, body: form, signal: AbortSignal.timeout(30_000) });
   const json = (await res.json()) as { code: number; data?: { image_key: string }; msg?: string };
   if (json.code !== 0 || !json.data) throw new Error(`feishu upload: ${json.msg}`);
   return json.data.image_key;
 }
 
 async function sendToChat(chatId: string, msgType: "text" | "post" | "interactive", content: unknown): Promise<string> {
-  const res = await fetch(`${API}/im/v1/messages?receive_id_type=chat_id`, {
+  const res = await outboundFetch("feishuInternal", `${API}/im/v1/messages?receive_id_type=chat_id`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${await tenantToken()}` },
     body: JSON.stringify({ receive_id: chatId, msg_type: msgType, content: JSON.stringify(content) }),
@@ -185,7 +186,7 @@ export async function forwardFeedbackToFeishu(id: number): Promise<"sent" | "dis
 
 /** Custom-bot webhook for content groups (selected cards, reset pushes). */
 export async function postWebhook(url: string, card: unknown): Promise<{ ok: boolean; status: number; body: string }> {
-  const res = await fetch(url, {
+  const res = await outboundFetch("feishuContent", url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ msg_type: "interactive", card }),

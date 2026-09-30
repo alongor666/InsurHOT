@@ -1,3 +1,4 @@
+import { outboundFetch } from "../../../outbound-policy.ts";
 // Artificial Analysis Intelligence Index (free API tier, headline index only; attribution required).
 import { credential } from "../../../config.ts";
 import { configurationOf, splitName } from "../configuration.ts";
@@ -20,7 +21,7 @@ export const artificialAnalysis: Fetcher = {
     const models: AaModel[] = [];
     let version: number | null = null;
     for (let page = 1; page <= 20; page++) {
-      const res = await fetch(`https://artificialanalysis.ai/api/v2/language/models/free?page=${page}`, {
+      const res = await outboundFetch("collect", `https://artificialanalysis.ai/api/v2/language/models/free?page=${page}`, {
         headers: { "x-api-key": key, accept: "application/json" },
         signal: AbortSignal.timeout(30_000),
       });

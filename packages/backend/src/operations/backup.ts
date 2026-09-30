@@ -1,3 +1,4 @@
+import { assertPaidOutboundDisabled } from "../outbound-policy.ts";
 // Database and file backups: a verified custom-format dump plus the uploaded files, sent
 // to the existing object store (Tencent COS through its S3-compatible API, AWS Signature V4) under
 // daily/ (Sundays also weekly/, the 1st also monthly/). A few local copies are kept.
@@ -70,6 +71,7 @@ async function fileSha256(file: string): Promise<string> {
 async function upload(s: Store, key: string, file: string, sha: string, size: number) {
   const url = new URL(`${s.endpoint}/${key}`);
   const headers = signV4({ method: "PUT", url, region: s.region, accessKey: s.secretId, secretKey: s.secretKey, payloadHash: sha, headers: { "content-length": String(size), "content-type": "application/octet-stream" } });
+  assertPaidOutboundDisabled();
   const res = await fetch(url, { method: "PUT", headers, body: createReadStream(file) as never, duplex: "half", signal: AbortSignal.timeout(60 * 60_000) } as RequestInit);
   if (!res.ok) throw new Error(`backup upload ${key}: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
 }

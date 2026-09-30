@@ -1,3 +1,4 @@
+import { outboundFetch } from "../outbound-policy.ts";
 // Images of a newly selected item, prepared before readers arrive: every rendition its card and its
 // page ask the image proxy for is fetched and resized once (a first reader otherwise waits seconds
 // for the source site), animations are re-encoded, and after the release gate the share image is
@@ -42,7 +43,7 @@ export async function prepareArticleMedia(articleId: string): Promise<{ renditio
 export async function warmShareImage(articleId: string): Promise<boolean> {
   const base = process.env.LOCAL_ROUTER_URL || "http://127.0.0.1:3000";
   try {
-    const res = await fetch(`${base}/og/items/${encodeURIComponent(articleId)}.png`, { signal: AbortSignal.timeout(15_000) });
+    const res = await outboundFetch("media", `${base}/og/items/${encodeURIComponent(articleId)}.png`, { signal: AbortSignal.timeout(15_000) });
     await res.arrayBuffer();
     return res.ok;
   } catch {
