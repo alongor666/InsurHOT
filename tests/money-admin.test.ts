@@ -117,6 +117,8 @@ test("a price or limit that is not what the mechanism can use is refused as ente
     { reason: " " }, { model: "" }, { currency: "EUR" }, { baseHost: "https://api.example/v1" }, { baseHost: "" }, { sourceUrl: "price page" },
     { inputPerMtok: -1 }, { inputPerMtok: Number.NaN }, { inputPerMtok: null, outputPerMtok: null }, { perUnit: 0.1 }, { maxUnitsPerRequest: 0 },
     { overheadTokens: 1.5 }, { reasoningOff: "reasoning=off" }, { outputCapIncludesReasoning: "yes" as never },
+    // More decimals than the column keeps: stored as written they would round, a tiny price to zero.
+    { inputPerMtok: 4e-7, outputPerMtok: 4e-7 }, { outputPerMtok: 0.1234564 }, { perRequest: 0.0000001 }, { perUnit: 1e-11, unit: "token" },
   ];
   for (const over of badPrices) await assert.rejects(approvePrice(price({ model: `bad-${RUN}`, ...over }), owner), status(400), JSON.stringify(over));
   assert.equal((await sql`SELECT 1 FROM service_prices WHERE model = ${`bad-${RUN}`}`).length, 0);
@@ -124,6 +126,10 @@ test("a price or limit that is not what the mechanism can use is refused as ente
     { scope: "global", key: "x" }, { scope: "capability", key: "no-such-capability" }, { scope: "subject", key: "quote" }, { scope: "model", key: MODEL },
     { scope: "capability", key: "score", monthlyLimit: -1 }, { scope: "capability", key: "score", currency: "EUR" }, { scope: "capability", key: "score", reason: "" },
   ];
+  // What the columns do hold is taken as entered: six decimals, ten for a per-unit price.
+  const fine = await approvePrice(price({ model: `fine-${RUN}`, inputPerMtok: 0.000001, outputPerMtok: 0.123456, perUnit: 0.0000000036, unit: "token", maxUnitsPerRequest: 100 }), owner) as Record<string, unknown>;
+  assert.deepEqual([fine.input_per_mtok, fine.output_per_mtok, fine.per_unit], [0.000001, 0.123456, 0.0000000036]);
+  await assert.rejects(approveLimit({ scope: "capability", key: "score", currency: "CNY", monthlyLimit: 0.0000001, reason: "r" }, owner), status(400));
   for (const over of badLimits) await assert.rejects(approveLimit({ currency: "CNY", monthlyLimit: 5, reason: "r", ...over } as never, owner), status(400), JSON.stringify(over));
   assert.equal((await sql`SELECT 1 FROM money_budgets`).length, 0);
 });
@@ -193,6 +199,47 @@ test("an unknown receipt released by hand gives its money back only when it was 
   assert.equal((await audits("receipt.release", `receipt:${free.claim.id}`))[0]!.after.moneyReleased, 1);
   // The retry of a released receipt is a new attempt with its own reservation.
   assert.equal(called(await claimPaidRequest(free.req)).attempt, 2);
+  await consistent();
+});
+
+test("found not billed gives back only the call that was checked: an earlier attempt of the receipt, released unchecked, keeps its money and its record", async () => {
+  // Attempt 1 is lost and released automatically, unchecked; the retry is attempt 2.
+  const { req, claim: first } = await lost();
+  await sql`UPDATE receipts SET updated_at = now() - interval '31 minutes' WHERE id = ${first.id}`;
+  assert.ok((await autoReleaseUnknownReceipts()).released >= 1);
+  const second = called(await claimPaidRequest(req));
+  assert.deepEqual([second.id, second.attempt], [first.id, 2]);
+  // The first call's own timeout arrives late: its attempt stays what the release made it.
+  await failPaidAttempt(first, new Error("socket hang up"), 1);
+  const [a1] = await sql<{ status: string; error: string; holds_reservation: boolean }[]>`SELECT status, error, holds_reservation FROM receipt_attempts WHERE id = ${first.attemptId}`;
+  assert.deepEqual([a1!.status, a1!.holds_reservation, /^自动放行/.test(a1!.error)], ["failed", true, true]);
+  // Attempt 2 is lost as well; the admin checks that call and finds it not billed.
+  await makeStale(second.id);
+  await markStalePendingReceipts();
+  assert.equal(await receiptStatus(second.id), "unknown");
+  const done = await releaseReceipt(second.id, { billed: false, note: "控制台没有第二次调用" }, "admin:t");
+  assert.equal(done!.moneyReleased, 1);
+  assert.deepEqual([(await attemptOf(second.attemptId)).holds_reservation, (await attemptOf(first.attemptId)).holds_reservation], [false, true], "only the checked call is given back");
+  // The automatic release was used: a third loss waits for the admin.
+  const third = called(await claimPaidRequest(req));
+  await makeStale(third.id);
+  await markStalePendingReceipts();
+  await sql`UPDATE receipts SET updated_at = now() - interval '31 minutes' WHERE id = ${third.id}`;
+  await autoReleaseUnknownReceipts();
+  assert.equal(await receiptStatus(third.id), "unknown");
+  await releaseReceipt(third.id, { billed: true, note: "n" }, "admin:t");
+
+  // Even with an earlier attempt recorded as unknown (a row from before this rule, or changed by hand),
+  // the release looks at the receipt's latest attempt only.
+  const other = await lost();
+  await sql`UPDATE receipts SET updated_at = now() - interval '31 minutes' WHERE id = ${other.claim.id}`;
+  await autoReleaseUnknownReceipts();
+  const retry = called(await claimPaidRequest(other.req));
+  await makeStale(retry.id);
+  await markStalePendingReceipts();
+  await sql`UPDATE receipt_attempts SET status = 'unknown' WHERE id = ${other.claim.attemptId}`;
+  assert.equal((await releaseReceipt(retry.id, { billed: false, note: "控制台没有第二次调用" }, "admin:t"))!.moneyReleased, 1);
+  assert.deepEqual([(await attemptOf(retry.attemptId)).holds_reservation, (await attemptOf(other.claim.attemptId)).holds_reservation], [false, true]);
   await consistent();
 });
 
@@ -314,8 +361,19 @@ test("alerts: a limit row at the threshold, subjects of a kind together, a suspe
   assert.match((await mine())[0]!.title, /已用 8\d%/);
   await limitOf("capability", "score", Math.ceil((score / 0.79) * 1e6) / 1e6);
   assert.deepEqual(await keys(), [], "just under the threshold");
+  // Used up: a finding of its own, so it goes out at once; the 80% one stays open beside it.
   await limitOf("capability", "score", score);
-  assert.match((await mine())[0]!.title, /用完了/);
+  assert.deepEqual(await keys(), ["today money.limit.capability.score.CNY", "today money.limit.capability.score.CNY.exhausted"]);
+  assert.deepEqual((await mine()).map((f) => /用完了/.test(f.title)), [false, true]);
+  // Last month's usage says nothing about this month's limit.
+  const lastMonth = budgetMonth(new Date(Date.parse(`${MONTH}T00:00:00+08:00`) - 86400_000));
+  await limitOf("capability", "digest", 1);
+  await sql`INSERT INTO money_usage (scope, key, currency, month, amount) VALUES ('capability', 'digest', 'CNY', ${lastMonth}, 1)`;
+  try {
+    assert.deepEqual((await keys()).filter((k) => k.includes("digest")), []);
+  } finally {
+    await sql`DELETE FROM money_usage WHERE scope = 'capability' AND key = 'digest' AND month = ${lastMonth}`;
+  }
   // A row stopped at zero is a decision, not an alert.
   await limitOf("capability", "score", 0);
   assert.deepEqual(await keys(), []);
@@ -327,6 +385,8 @@ test("alerts: a limit row at the threshold, subjects of a kind together, a suspe
   const subjectFindings = (await mine()).filter((f) => f.key === "money.limit.subject.article.CNY");
   assert.equal(subjectFindings.length, 1);
   assert.match(subjectFindings[0]!.title, /^\d+ 个article/);
+  await limitOf("subject", "article", 0);
+  assert.deepEqual(await keys(), [], "per-subject rows stopped at zero raise nothing either");
   await limitOf("subject", "article", 100);
 
   // An overrun suspends the price: a "now" finding until the owner approves it again.
@@ -401,11 +461,11 @@ test("over the admin API: the session's role decides, a refusal is a 403, and th
     assert.equal((await call("GET", "/api/admin/me", asAdmin)).json().owner, false);
     assert.equal((await call("GET", "/api/admin/money", {})).statusCode, 401);
 
-    const limit = { scope: "capability", key: "digest", currency: "CNY", monthlyLimit: 7, reason: "经 API 批准" };
+    const limit = { scope: "capability", key: "structure", currency: "CNY", monthlyLimit: 7, reason: "经 API 批准" };
     const refusedCall = await call("PUT", "/api/admin/money/limits", asAdmin, limit);
     assert.deepEqual([refusedCall.statusCode, refusedCall.json().code], [403, "forbidden"]);
     assert.equal((await call("PUT", "/api/admin/money/limits", { cookie: asOwner.cookie }, limit)).statusCode, 403, "no CSRF token");
-    assert.equal((await sql`SELECT 1 FROM money_budgets WHERE scope = 'capability' AND key = 'digest'`).length, 0);
+    assert.equal((await sql`SELECT 1 FROM money_budgets WHERE scope = 'capability' AND key = 'structure'`).length, 0);
     const approved = await call("PUT", "/api/admin/money/limits", asOwner, limit);
     assert.deepEqual([approved.statusCode, approved.json().approved_by, approved.json().monthly_limit], [200, `admin:${owner.userId}`, 7]);
     assert.equal((await call("PUT", "/api/admin/money/prices", asAdmin, price())).statusCode, 403);
@@ -419,7 +479,7 @@ test("over the admin API: the session's role decides, a refusal is a 403, and th
     const body = overview.json();
     assert.deepEqual([body.month, body.alertRatio, body.subjectKinds], [MONTH, 0.8, ["article", "report", "story"]]);
     assert.ok(body.capabilities.includes("collect.dajiala") && body.capabilities.includes("embedding") && body.capabilities.includes("score"));
-    assert.ok(body.limits.some((l: { key: string; approved_by: string }) => l.key === "digest" && l.approved_by === `admin:${owner.userId}`));
+    assert.ok(body.limits.some((l: { key: string; approved_by: string }) => l.key === "structure" && l.approved_by === `admin:${owner.userId}`));
     assert.equal((await call("POST", "/api/admin/money/reconcile", asAdmin, {})).json().mismatches, 0);
   } finally {
     await app.close();

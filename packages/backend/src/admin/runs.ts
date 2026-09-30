@@ -80,17 +80,20 @@ export async function runsOverview() {
  * processing (one action, not two). Only an unknown receipt is released, once.
  *
  * Money (ADR-015): the lost attempt keeps its reservation unless an admin found it not billed
- * (`billed === false`). Released unchecked (`null`) or found billed, it stays counted. Lock order as in
- * providers/money.ts: the receipt row, the money calls, then the attempt rows.
+ * (`billed === false`). Released unchecked (`null`) or found billed, it stays counted. What the admin
+ * checked is the receipt's latest attempt, and only that one is given back: an earlier attempt of the
+ * same receipt that was released unchecked keeps its money. Lock order as in providers/money.ts: the
+ * receipt row, the money calls, then the attempt rows.
  */
 async function release(id: number, error: string, actor: string, note: string, billed: boolean | null, acknowledgeFigure = false) {
   const before = await sql.begin(async (tx) => {
-    const [receipt] = await tx<{ subject: string | null; purpose: string }[]>`SELECT subject, purpose FROM receipts WHERE id = ${id} AND status = 'unknown' FOR UPDATE`;
+    const [receipt] = await tx<{ subject: string | null; purpose: string; attempts: number }[]>`SELECT subject, purpose, attempts FROM receipts WHERE id = ${id} AND status = 'unknown' FOR UPDATE`;
     if (!receipt) return null;
     let moneyReleased = 0;
     if (billed === false) {
       const lost = await tx<{ id: number; settled_amount: number | null; reserved_currency: string | null }[]>`
-        SELECT id, settled_amount, reserved_currency FROM receipt_attempts WHERE receipt_id = ${id} AND status = 'unknown' AND holds_reservation ORDER BY id`;
+        SELECT id, settled_amount, reserved_currency FROM receipt_attempts
+        WHERE receipt_id = ${id} AND attempt = ${receipt.attempts} AND status = 'unknown' AND holds_reservation`;
       const reported = lost.find((a) => a.settled_amount !== null);
       if (reported && !acknowledgeFigure) {
         throw new Conflict(`供应商为这次调用报告过金额 ${reported.settled_amount} ${reported.reserved_currency}；确认它确实没有计费后，带上 acknowledgeFigure 再放行`);
@@ -102,7 +105,7 @@ async function release(id: number, error: string, actor: string, note: string, b
     }
     await tx`UPDATE receipts SET status = 'failed', error = ${error}, updated_at = now() WHERE id = ${id}`;
     await tx`UPDATE receipt_attempts SET status = 'failed', error = ${error} WHERE receipt_id = ${id} AND status = 'unknown'`;
-    return { ...receipt, moneyReleased };
+    return { subject: receipt.subject, purpose: receipt.purpose, moneyReleased };
   }) as { subject: string | null; purpose: string; moneyReleased: number } | null;
   if (!before) return null;
   const article = before.purpose === "analyze_article" ? /^article:([^@]+)@/.exec(before.subject ?? "")?.[1] : undefined;

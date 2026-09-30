@@ -21,8 +21,11 @@ const label = (scope: string, key: string) => (scope === "global" ? "全部付�
 const pct = (ratio: number) => `${Math.round(ratio * 100)}%`;
 
 /**
- * Money findings. "today": a monthly limit row is nearly or fully used (global and capability rows one
- * by one; subjects of one kind together, since each article or story has its own row). "now": a price
+ * Money findings. "today": a monthly limit row is nearly used, and again, under a key of its own, when
+ * it is used up (a row that fills up on the day its 80% alert went out is announced at once, not a day
+ * later; the 80% finding stays open meanwhile, so no "recovered" goes out for it). Global and
+ * capability rows one by one; subjects of one kind together, since each article or story has its own
+ * row. "now": a price
  * row stopped because a call cost more than its reservation, an overrun whose price row no longer
  * exists, and a ledger that disagrees with the attempts.
  */
@@ -35,16 +38,29 @@ export async function moneyFindings(now = Date.now()): Promise<Finding[]> {
     WHERE b.scope IN ('global', 'capability') AND b.monthly_limit > 0 AND u.amount >= b.monthly_limit * ${MONEY_ALERT_RATIO}::numeric
     ORDER BY b.scope, b.key, b.currency`;
   for (const r of near) {
-    const full = Number(r.used) >= Number(r.monthly_limit);
+    const key = `money.limit.${r.scope}.${r.key || "all"}.${r.currency}`;
+    const detail = `money_budgets ${r.scope}:${r.key} ${r.currency}：已占用 ${r.used}，上限 ${r.monthly_limit}（按预留上界计，含未知结果与失败但可能已计费的调用）`;
+    const action = "需要你决定是否提高上限（后台批准新的限额）；不提高就保持现状";
     out.push({
-      key: `money.limit.${r.scope}.${r.key || "all"}.${r.currency}`,
+      key,
       level: "today",
-      title: full ? `本月${label(r.scope, r.key)}的金额上限用完了` : `本月${label(r.scope, r.key)}的金额上限已用 ${pct(Number(r.used) / Number(r.monthly_limit))}`,
-      impact: full ? "计入这条上限的付费调用全部停止，相关内容停在后台等待处理" : "用完后，计入这条上限的付费调用会全部停止",
+      title: `本月${label(r.scope, r.key)}的金额上限已用 ${pct(Math.min(1, Number(r.used) / Number(r.monthly_limit)))}`,
+      impact: "用完后，计入这条上限的付费调用会全部停止",
       heals: "不会，下个月重新计算",
-      action: "需要你决定是否提高上限（后台批准新的限额）；不提高就保持现状",
-      detail: `money_budgets ${r.scope}:${r.key} ${r.currency}：已占用 ${r.used}，上限 ${r.monthly_limit}（按预留上界计，含未知结果与失败但可能已计费的调用）`,
+      action,
+      detail,
     });
+    if (Number(r.used) >= Number(r.monthly_limit)) {
+      out.push({
+        key: `${key}.exhausted`,
+        level: "today",
+        title: `本月${label(r.scope, r.key)}的金额上限用完了`,
+        impact: "计入这条上限的付费调用全部停止，相关内容停在后台等待处理",
+        heals: "不会，下个月重新计算",
+        action,
+        detail,
+      });
+    }
   }
   const subjects = await sql<{ kind: string; currency: string; n: number; monthly_limit: number }[]>`
     SELECT b.key AS kind, b.currency, count(*)::int AS n, b.monthly_limit

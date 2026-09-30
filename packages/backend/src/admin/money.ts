@@ -28,10 +28,15 @@ const reasonOf = (value: unknown): string => {
   if (!reason) throw bad("reason is required");
   return reason.slice(0, 500);
 };
-/** A price or a limit: a finite, non-negative number the column can hold, or null where it may be absent. */
-function amount(value: unknown, name: string, max: number): number | null {
+/**
+ * A price or a limit: a finite, non-negative number the column holds exactly, or null where it may be
+ * absent. A value with more decimals than the column would be stored rounded, a small price as zero,
+ * and the bound computed from it would be too low: it is refused instead.
+ */
+function amount(value: unknown, name: string, max: number, decimals = 6): number | null {
   if (value === null || value === undefined) return null;
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > max) throw bad(`${name} must be a number between 0 and ${max}`);
+  if (Number(value.toFixed(decimals)) !== value) throw bad(`${name} has more than ${decimals} decimals, which the price table would round`);
   return value;
 }
 function integer(value: unknown, name: string, min: number): number | null {
@@ -96,7 +101,7 @@ export async function approvePrice(input: PriceApproval, admin: AdminPrincipal) 
   const row = {
     service, model, currency: currencyOf(input.currency), base_host: baseHost,
     input_per_mtok: amount(input.inputPerMtok, "inputPerMtok", 99_999_999), output_per_mtok: amount(input.outputPerMtok, "outputPerMtok", 99_999_999),
-    per_request: amount(input.perRequest, "perRequest", 99_999_999), per_unit: amount(input.perUnit, "perUnit", 99_999_999),
+    per_request: amount(input.perRequest, "perRequest", 99_999_999), per_unit: amount(input.perUnit, "perUnit", 99_999_999, 10),
     unit: input.unit == null ? null : String(input.unit).trim().slice(0, 40) || null,
     max_units_per_request: integer(input.maxUnitsPerRequest, "maxUnitsPerRequest", 1),
     overhead_tokens: integer(input.overheadTokens, "overheadTokens", 0) ?? 0,

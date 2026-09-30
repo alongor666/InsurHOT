@@ -226,8 +226,11 @@ const lockReceipt = (tx: Db, id: number) => tx<{ status: string; attempts: numbe
 
 /**
  * Step 3 after a failed call, bookkeeping only: settles the money, then records the failure. The
- * attempt always gets its outcome; the receipt only while it still waits on this very attempt, so a
- * failure that arrives late (the receipt went unknown, or a newer attempt is under way) cannot reopen it.
+ * receipt takes it only while it still waits on this very attempt, so a failure that arrives late (the
+ * receipt went unknown, or a newer attempt is under way) cannot reopen it. The attempt takes it unless
+ * it was closed meanwhile: an attempt already released as failed keeps that record (the note of an
+ * automatic release is what stops a second one), and is not turned back into "unknown", which a later
+ * release by hand would read as the call the admin checked.
  */
 export async function failPaidAttempt(claim: CallClaim, error: unknown, latencyMs: number): Promise<void> {
   const status = error instanceof ProviderRejectedError ? "failed" : "unknown";
@@ -240,7 +243,10 @@ export async function failPaidAttempt(claim: CallClaim, error: unknown, latencyM
       await tx`UPDATE receipts SET status = ${status}, error = ${message}, updated_at = now() WHERE id = ${claim.id}`;
     }
     await tx`
-      UPDATE receipt_attempts SET status = ${status}, error = ${message}, latency_ms = ${latencyMs}, finished_at = now(),
+      UPDATE receipt_attempts SET
+        status = CASE WHEN status IN ('failed', 'received') THEN status ELSE ${status} END,
+        error = CASE WHEN status IN ('failed', 'received') THEN error ELSE ${message} END,
+        latency_ms = ${latencyMs}, finished_at = now(),
         cost = ${settled.figure}, currency = ${settled.figure === null ? null : claim.price.currency}, cost_basis = ${settled.figure === null ? null : "actual"}
       WHERE id = ${claim.attemptId}`;
   });

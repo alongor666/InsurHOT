@@ -92,3 +92,38 @@
 ✔ releases, late outcomes, retries, sweeps and approvals at the same moment do not deadlock, and the ledger still adds up
 ℹ pass 10
 ℹ fail 0
+
+# ---- after review round 1 ----
+## after review round 1: no mutation
+ℹ pass 11
+ℹ fail 0
+## mutation: not-billed release gives back every unknown attempt of the receipt (the round-1 code)
+✖ found not billed gives back only the call that was checked: an earlier attempt of the receipt, released unchecked, keeps its money and its record
+ℹ pass 10
+ℹ fail 1
+## mutation: a late failure rewrites an attempt that was already released (the round-1 code)
+✖ found not billed gives back only the call that was checked: an earlier attempt of the receipt, released unchecked, keeps its money and its record
+ℹ pass 10
+ℹ fail 1
+## mutation: prices with more decimals than the column are accepted (the round-1 code)
+✖ a price or limit that is not what the mechanism can use is refused as entered
+ℹ pass 10
+ℹ fail 1
+## mutation: a used-up limit has no finding of its own (the round-1 code)
+✖ alerts: a limit row at the threshold, subjects of a kind together, a suspended price, and a ledger that does not add up
+✖ releases, late outcomes, retries, sweeps and approvals at the same moment do not deadlock, and the ledger still adds up
+ℹ pass 9
+ℹ fail 2
+## mutation: the limit alert ignores the month (reviewer's B1)
+✖ alerts: a limit row at the threshold, subjects of a kind together, a suspended price, and a ledger that does not add up
+✖ releases, late outcomes, retries, sweeps and approvals at the same moment do not deadlock, and the ledger still adds up
+ℹ pass 9
+ℹ fail 2
+## mutation: subject rows stopped at zero alert (reviewer's B2)
+✖ alerts: a limit row at the threshold, subjects of a kind together, a suspended price, and a ledger that does not add up
+✖ releases, late outcomes, retries, sweeps and approvals at the same moment do not deadlock, and the ledger still adds up
+ℹ pass 9
+ℹ fail 2
+## no mutation, again on the same database
+ℹ pass 11
+ℹ fail 0
