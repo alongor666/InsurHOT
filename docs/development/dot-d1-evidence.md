@@ -18,7 +18,7 @@
 
 | 命令/检查 | 结果 | 日志 |
 |---|---|---|
-| `node tests/dot-ingest.test.ts` | 9/9 PASS，exit0 | [定向检查](evidence/dot-d1-tests.log) |
+| `node tests/dot-ingest.test.ts` | 11/11 PASS，exit0 | [定向检查](evidence/dot-d1-tests.log) |
 | `npm run typecheck` | 全仓PASS，exit0 | [类型检查](evidence/dot-d1-typecheck.log) |
 | `npm run build -w @aihot/web` | 客户端+SSR PASS，exit0 | [构建](evidence/dot-d1-build.log) |
 | `git diff --check` | PASS，exit0 | 提交前执行 |
@@ -26,7 +26,9 @@
 | Docker smoke、全套backend/web tests、完整应用CI | **NOT RUN**；M0.5另行交付 | 不由定向检查替代 |
 | 实际Dot连接/责任/定时任务/真实批次 | **NOT CONFIGURED / NOT RUN** | D2另行交付 |
 
-9项覆盖：缺省/false/非法开关零storage；专用token与placeholder拒绝；来源/服务器/Dot时间分离及HTML数据；对象键序幂等与不同正文409；整批严格格式拒绝；bodyLimit/坏JSON；存储错误不泄露数据；50条边界与空来源日期；全应用注册的缺省拒绝且零SQL transaction。
+11项覆盖：缺省/false/非法开关零storage；专用token与placeholder拒绝；来源/服务器/Dot时间分离及HTML数据；对象键序幂等与不同正文409；整批严格格式拒绝；bodyLimit/坏JSON；存储错误不泄露数据；50条边界与空来源日期；全应用注册的缺省拒绝且零SQL transaction；33项跨字段NUL/孤立高低surrogate探测全部400零storage；合法emoji原文保留。
+
+独立初审在PR #9初版HEAD `218d37c936cb7116a475d2cebd4effd41a14d7aa`发现P2 DOT-D1-R01：格式检查允许PG text/jsonb不接受的NUL和孤立surrogate，坏批次可能被误报为可重试存储故障。修复在入库前统一拒绝这类字符串，新增两项测试；最终11项结果及日志在修复树上重跑。PG失败来自官方类型合同推导，数据库实际复现仍NOT RUN；修复关闭结论以PR中最终固定HEAD的独立复审为准。
 
 存在既有Fastify日志配置弃用和npm配置警告；不是本次引入，检查退出0。buildApp的本地测试会记录一个503请求日志，仅方法/路径/状态，无凭据与正文。
 

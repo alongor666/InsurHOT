@@ -49,7 +49,7 @@ D2真实交付回执用于证明连接可用，不用于重新评测Dot内容质
 | `sources` | 1–10个原始来源；HTTPS且无URL凭据；publisher最长200；publishedAt可为null |
 | `dotObservedAt` | Dot报告的观测时间，独立于服务器和来源时间 |
 
-所有层级拒绝未知字段。对象键序不影响payload哈希；数组顺序和具体文本有意义。文字及HTML均当数据保存，不执行指令；后续显示必须采用安全文本渲染。入口不跟随来源链接，不验证发布者自报身份，也不认证Dot作者身份。
+所有层级拒绝未知字段；字符串拒绝NUL和孤立UTF-16 surrogate，以免合法JSON在PG存储时变成可重试错误。对象键序不影响payload哈希；数组顺序和具体文本有意义。文字及HTML均当数据保存，不执行指令；后续显示必须采用安全文本渲染。入口不跟随来源链接，不验证发布者自报身份，也不认证Dot作者身份。
 
 服务器生成`receivedAt`/`firstSeenAt`，不取文章发布时间或Dot报告时间。重复批次返回首次时间。当前firstSeen只代表本系统首次接收该批次/条目，不代表事件最早公开、源文首次观测或已证明全球首发。存储默认`publication_status=private`、`rights_status=unknown`、`evidence_status=unverified`；这些表示公开证据/权限尚未建立，不是新增Dot质量试运行。
 

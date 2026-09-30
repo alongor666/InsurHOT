@@ -29,7 +29,7 @@ Dot负责持续发现、整理与解读保险行业公开信息，作为正式�
 
 | 交付 | 范围 | 当前状态与验收边界 |
 |---|---|---|
-| D1 | v1 JSON、专用鉴权/开关、POST `/api/ingest/dot`、隔离存储与幂等回执 | 独立分支`codex/dot-intake-contract` stacked on #7；已实现并完成9项本地HTTP/service检查和typecheck；独立工程评审/最终构建见D1证据，PG未运行保持NOT RUN |
+| D1 | v1 JSON、专用鉴权/开关、POST `/api/ingest/dot`、隔离存储与幂等回执 | 独立分支`codex/dot-intake-contract` stacked on #7；已实现并完成11项本地HTTP/service检查和typecheck；独立工程评审/最终构建见D1证据，PG未运行保持NOT RUN |
 | D2 | Dot实际应用/插件或本机交付桥、责任配置及真实接收回执 | 未配置；官方专用Dot API/webhook未证实，账户连接不得假称完成；不另做内容质量试运行 |
 | D3 | 原始证据/事件关联、三支柱展示与更正撤回 | 依赖T2/T4及既有G2；尚未实现，不提前公开 |
 

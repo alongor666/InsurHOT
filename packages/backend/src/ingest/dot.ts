@@ -2,11 +2,15 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { DOT_MAX_ITEMS, DOT_SCHEMA_VERSION, type DotDelivery, type DotReceipt } from '@aihot/contracts/dot-ingest';
 
-const id = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/);
-const text = (max: number) => z.string().min(1).max(max).refine((v) => v.trim().length > 0);
-const timestamp = z.iso.datetime({ offset: true });
+// PostgreSQL text/jsonb cannot represent NUL or unpaired UTF-16 surrogates.
+// Reject them before the repository, rather than reporting a retryable storage failure.
+const isPostgresString = (value: string) => !value.includes('\u0000') && value.isWellFormed();
+const storedString = z.string().refine(isPostgresString);
+const id = storedString.regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/);
+const text = (max: number) => storedString.min(1).max(max).refine((v) => v.trim().length > 0);
+const timestamp = z.iso.datetime({ offset: true }).refine(isPostgresString);
 const source = z.strictObject({
-  url: z.string().max(2048).refine((value) => {
+  url: storedString.max(2048).refine((value) => {
     try { const url = new URL(value); return url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password; }
     catch { return false; }
   }),

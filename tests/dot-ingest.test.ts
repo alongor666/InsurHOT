@@ -123,3 +123,51 @@ test('application registers Dot endpoint and disabled intake performs no SQL tra
     assert.equal(res.statusCode, 503); assert.deepEqual(res.json(), { ok: false, error: 'dot_ingest_disabled' }); assert.equal(transactions, 0);
   } finally { await app.close(); sql.begin = original; if (saved === undefined) delete process.env.DOT_INGEST_ENABLED; else process.env.DOT_INGEST_ENABLED = saved; await closeDb(); }
 });
+
+
+test('every persisted string rejects NUL and lone high/low surrogates before repository access', async () => {
+  const { repo, app, post } = setup();
+  // Literal/enum strings also appear in storage; their fixed values reject these probes.
+  const fields: { name: string; mutate: (p: DotDelivery, bad: string) => void }[] = [
+    { name: 'schemaVersion', mutate: (p, bad) => { p.schemaVersion = `${p.schemaVersion}${bad}` as never; } },
+    { name: 'deliveryId', mutate: (p, bad) => { p.deliveryId += bad; } },
+    { name: 'itemId', mutate: (p, bad) => { p.items[1].itemId += bad; } },
+    { name: 'title', mutate: (p, bad) => { p.items[1].title += bad; } },
+    { name: 'summary', mutate: (p, bad) => { p.items[1].summary += bad; } },
+    { name: 'pillar', mutate: (p, bad) => { p.items[1].pillars[0] = `changes${bad}` as never; } },
+    { name: 'assertionKind', mutate: (p, bad) => { p.items[1].assertionKind = `reported${bad}` as never; } },
+    { name: 'url', mutate: (p, bad) => { p.items[1].sources[0].url += bad; } },
+    { name: 'publisher', mutate: (p, bad) => { p.items[1].sources[0].publisher += bad; } },
+    { name: 'publishedAt', mutate: (p, bad) => { p.items[1].sources[0].publishedAt += bad; } },
+    { name: 'dotObservedAt', mutate: (p, bad) => { p.items[1].dotObservedAt += bad; } },
+  ];
+  try {
+    for (const bad of ['\u0000', '\ud800', '\udc00']) {
+      for (const field of fields) {
+        const p = payload();
+        p.items.push(structuredClone({ ...p.items[0], itemId: 'item-2' }));
+        field.mutate(p, bad);
+        const res = await post(p);
+        assert.equal(res.statusCode, 400, `${field.name}: ${JSON.stringify(bad)}`);
+        assert.deepEqual(res.json(), { ok: false, error: 'invalid_delivery' });
+        assert.equal(repo.calls, 0, field.name);
+      }
+    }
+    assert.equal(repo.rows.size, 0);
+  } finally { await app.close(); }
+});
+
+test('well-formed emoji survive validation and persistence as exact original text', async () => {
+  const { repo, app, post } = setup();
+  try {
+    const p = payload();
+    p.items[0].title = 'Insurance 🌍';
+    p.items[0].summary = 'Dot-original summary 🛡️';
+    p.items[0].sources[0].publisher = 'Example publisher 😀';
+    p.items[0].sources[0].url = 'https://example.org/report/😀';
+    const res = await post(p);
+    assert.equal(res.statusCode, 200);
+    assert.equal(repo.calls, 1);
+    assert.deepEqual(repo.rows.get(p.deliveryId)!.payload, p);
+  } finally { await app.close(); }
+});
