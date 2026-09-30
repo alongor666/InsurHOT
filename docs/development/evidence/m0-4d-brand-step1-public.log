@@ -1,0 +1,20 @@
+# brand literals in public outputs after step 1 (main 3c9591c → this branch), local built site
+/:  1 aihot-theme 
+/about:  2 AIHOT 1 aihot-theme 
+/agent:  1 aihot-theme 
+/privacy:  1 aihot-theme 
+/terms:  1 aihot-theme 
+/hot:  1 aihot-theme 
+/daily:  1 aihot-theme 
+/llms.txt: 
+/feed.xml: 
+/feed/all.xml: 
+/openapi-v1.json: 
+/manifest.webmanifest: 
+/api/v1/items: 
+
+mcp tools/list:
+"name":"insurhot_get_latest" "name":"insurhot_search" "name":"insurhot_get_hot_topics" "name":"insurhot_get_story" "name":"insurhot_get_daily" 
+
+about page acknowledgement:
+本站基于开源项目 AIHOT（MIT 许可）构建，并按本站的行业与规则改造；上游的许可与署名保留在仓库的 LICENSE 与 NOTICE 中。AIHOT 的名称与标志不随代码授权，本站不

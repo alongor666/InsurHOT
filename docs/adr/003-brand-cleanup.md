@@ -1,6 +1,6 @@
 # ADR-003：公开品牌从 AIHOT 改为 InsurHOT，许可与来源记录保留原名
 
-状态：Proposed（2026-09-30，Claude 会话起草。按 `docs/phase0/delivery-gates.md` §5，可逆改名属 Codex 技术裁决；正式品牌对外使用前的核准属 owner 与法律角色，本 ADR 不替代该核准）。Refs #4、#12；主规格 §ADR-003 要求"`@insurhot/*`；检查脚本禁止对外出现 AIHOT"；上游许可见 `LICENSE`、`NOTICE`、`UPSTREAM.md`。
+状态：Accepted（owner 于 2026-10-01 经结构化提问批准五步全做，记录见 Issue #15；原稿 2026-09-30 由 Claude 会话起草。按 `docs/phase0/delivery-gates.md` §5，可逆改名属 Codex 技术裁决；正式品牌对外使用前的核准属 owner 与法律角色，本 ADR 不替代该核准）。Refs #4、#12；主规格 §ADR-003 要求"`@insurhot/*`；检查脚本禁止对外出现 AIHOT"；上游许可见 `LICENSE`、`NOTICE`、`UPSTREAM.md`。
 
 ## 背景：痕迹分类（main `f08fe132`；排除 `apps/web/build`、`.react-router`、`node_modules`）
 
@@ -13,6 +13,8 @@
 | E. 运维可见标识 | 请求头 `x-aihot-ssr`（`api.server.ts:21`）；pg-boss `application_name: "aihot-jobs"`（`jobs/queue.ts:48`）；备份文件名 `aihot-<stamp>.dump`/`aihot-files-<stamp>.tar.gz` 与清理匹配前缀 `"aihot-2"`/`"aihot-files-"`（`operations/backup.ts:84-119`）；`docker-compose.yml` 服务/镜像/库名 `aihot`；`.env.example` | 部署与运维 |
 | F. 数据键与外部约定 | 两处：(1) `sources.config` jsonb 中的 `_aihot` 键（`sources/config-keys.ts:7,21,28`、`sources/collect.ts:130-131`、`industry/sources.json` 18 处）；(2) 外部采集/推送方提交条目时的 `raw._aihot.{backfill,baseline}` 约定（`ingest/items.ts:24,55`，随 `raw` 存入 `articles.raw`；`docs/sources.md:97` 与主规格 F-13 均以 `raw._aihot` 命名） | — | 存量数据 + 对外接口约定 |
 | G. 许可与来源记录（保留原名） | `LICENSE`、`NOTICE`、`assets/*/NOTICE.md`、`assets/og-fonts/LICENSE`、`vendor-manifests/aihot*.json`、`scripts/stage_upstream.py`、`scripts/verify_upstream_import.py`、`.github/workflows/bootstrap.yml:25`（断言上游仓库名）、`UPSTREAM.md`、`docs/upstream/*`、`docs/adr/001-*`、`docs/phase0/*`（含 `aihot-audit.md`、研究附录）、`docs/development/m0-*`、上游随附文档 `docs/customize.md`/`leaderboard.md`/`selection.md`/`sources.md`/`architecture.md`/`deploy.md`、`tests/setup.ts` 对上游模型预设的注释 | — | 来源归属，不是品牌 |
+
+> 2026-10-01 owner 输入（Issue #15）：站名 `InsurHOT`，副标题「保险行业高价值变化与趋势情报」，subject「保险」；页脚的 AIHOT 致谢**移除**，致谢只放「关于」页与 NOTICE；`raw._aihot` 改为 `_insurhot`（现无外部接入者）。对外正式使用品牌仍等 G2 的法律核准。第 1 步的实施见 `docs/development/m0-4d-brand-step1-evidence.md`。
 
 ## 决定（建议）
 

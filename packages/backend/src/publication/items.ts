@@ -119,7 +119,7 @@ export function toItemSummary(row: ItemRow): ItemSummary {
       iconUrl: proxiedImage(row.source_icon, "avatar"),
       ...(proxiedImageSet(row.source_icon, "avatar") ? { iconSrcSet: proxiedImageSet(row.source_icon, "avatar")! } : {}),
     },
-    links: { aihot: `/items/${row.id}`, original: row.url },
+    links: { insurhot: `/items/${row.id}`, original: row.url },
     publishedAt: row.published_at?.toISOString() ?? null,
     discoveredAt: row.discovered_at.toISOString(),
     timelineAt: row.timeline_at.toISOString(),

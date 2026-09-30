@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { approveLimit, approvePrice, moneyOverview, releaseHeldAttempt, withdrawPrice, type PriceApproval } from "@aihot/backend/admin/money";
 import { autoReleaseUnknownReceipts, releaseReceipt } from "@aihot/backend/admin/runs";
-import type { AdminPrincipal } from "@aihot/backend/admin/auth";
+import { SESSION_COOKIE, type AdminPrincipal } from "@aihot/backend/admin/auth";
 import { closeDb, sql } from "@aihot/backend/db";
 import { stopBoss } from "@aihot/backend/jobs/queue";
 import { sha256 } from "@aihot/backend/lib/ids";
@@ -453,7 +453,7 @@ test("over the admin API: the session's role decides, a refusal is a 403, and th
     const session = async (who: AdminPrincipal) => {
       const token = `${who.role}-${RUN}`;
       await sql`INSERT INTO admin_sessions (id_hash, user_id, csrf_token, expires_at) VALUES (${sha256(token)}, ${who.userId}, ${`csrf-${token}`}, now() + interval '1 hour')`;
-      return { cookie: `aihot_admin=${token}`, "x-csrf-token": `csrf-${token}` };
+      return { cookie: `${SESSION_COOKIE}=${token}`, "x-csrf-token": `csrf-${token}` };
     };
     const asOwner = await session(owner), asAdmin = await session(admin);
     const call = (method: "GET" | "PUT" | "POST", url: string, headers: Record<string, string>, payload?: unknown) => app.inject({ method, url, headers, payload: payload as never });
