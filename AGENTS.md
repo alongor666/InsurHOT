@@ -2,7 +2,7 @@
 
 先读 README、docs/phase0/delivery-gates.md、docs/phase0/review-2026-09-29.md 与主规格。品牌定位沿用 C0：发现保险行业什么重要、什么正在变化、什么正在诞生；不做内部经营系统。
 
-- Phase 0规划已验收；M0导入工具开发已启动，应用尚未整合，没有已验收MVP。先看实际PR/HEAD/任务状态，再读docs/development/action-plan.md及UPSTREAM.md执行。
+- Phase 0规划已验收；M0.2固定快照已整合且本地typecheck/web build通过，待独立评审，没有已验收MVP。M0.3安全默认/预算、M0.4品牌/模块及M0.5完整CI仍未完成，不启动worker或真实业务调用。先看实际PR/HEAD/任务状态，再读docs/development/action-plan.md及UPSTREAM.md执行。
 - 提交前说明所属任务、范围、验收证据与未决项。不要把 Proposed ADR 改成 owner 已批准；研究附录是候选材料。
 - 使用独立任务分支，保持单一写入者；不在原作者活动分支上并发写。不得未经实测称CI通过。
 - 文档检查与应用CI分开。原稿独立评审和修订自检也分开；自检不冒充独立复审。
