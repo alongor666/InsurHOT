@@ -1,23 +1,24 @@
-✔ literal opt-in denies default, false and invalid values before storage (67.707125ms)
-✔ dedicated valid token required before storage; old ingest token cannot authorize (12.237459ms)
-✔ per-address rate limit counts before authentication and does not affect other addresses (20.121709ms)
-✔ receipt and isolated payload preserve server observation, source and Dot times; HTML remains data (2.483708ms)
-✔ same content with changed key order duplicates; changed content conflicts, first seen preserved (3.859792ms)
-✔ strict full-batch validation rejects unsafe or unrecognized data before storage (15.318875ms)
-✔ HTTP body limit and malformed JSON return stable no-store errors without storage (3.567208ms)
-✔ storage failures do not disclose data, tokens or database errors (2.301417ms)
-(node:76200) [FSTDEP023] FastifyDeprecation: disableRequestLogging option is deprecated. Use the logController option with disableRequestLogging or isLogDisabled override instead. The disableRequestLogging top-level option will be removed in `fastify@6`.
+✔ literal opt-in denies default, false and invalid values before storage (43.180833ms)
+✔ dedicated valid token required before storage; old ingest token cannot authorize (3.864208ms)
+✔ per-address rate limit counts before authentication and does not affect other addresses (7.595416ms)
+✔ overall cap holds when a client rotates forged X-Forwarded-For under trustProxy (11.706209ms)
+✔ receipt and isolated payload preserve server observation, source and Dot times; HTML remains data (1.992666ms)
+✔ same content with changed key order duplicates; changed content conflicts, first seen preserved (1.428083ms)
+✔ strict full-batch validation rejects unsafe or unrecognized data before storage (3.460208ms)
+✔ HTTP body limit and malformed JSON return stable no-store errors without storage (2.993416ms)
+✔ storage failures do not disclose data, tokens or database errors (0.882875ms)
+(node:2099) [FSTDEP023] FastifyDeprecation: disableRequestLogging option is deprecated. Use the logController option with disableRequestLogging or isLogDisabled override instead. The disableRequestLogging top-level option will be removed in `fastify@6`.
 (Use `node --trace-warnings ...` to show where the warning was created)
-✔ maximum batch accepts nullable source date without promoting it into server timestamps (7.174833ms)
-{"level":40,"time":1790755157154,"pid":76200,"hostname":"redacted","reqId":"29168083-12d4-4c2f-8f78-6820c0f5b947","method":"POST","path":"/api/ingest/dot","status":503,"ms":0,"msg":"request"}
-✔ application registers Dot endpoint and disabled intake performs no SQL transaction (710.170833ms)
-✔ every persisted string rejects NUL and lone high/low surrogates before repository access (34.894209ms)
-✔ well-formed emoji survive validation and persistence as exact original text (9.677459ms)
-ℹ tests 12
+✔ maximum batch accepts nullable source date without promoting it into server timestamps (1.09125ms)
+{"level":40,"time":1790755719534,"pid":2099,"hostname":"redacted","reqId":"81cc4e19-3641-438e-ab34-5ebe70311cf6","method":"POST","path":"/api/ingest/dot","status":503,"ms":0,"msg":"request"}
+✔ application registers Dot endpoint and disabled intake performs no SQL transaction (418.599208ms)
+✔ every persisted string rejects NUL and lone high/low surrogates before repository access (10.046625ms)
+✔ well-formed emoji survive validation and persistence as exact original text (0.75525ms)
+ℹ tests 13
 ℹ suites 0
-ℹ pass 12
+ℹ pass 13
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 1220.456375
+ℹ duration_ms 702.43525

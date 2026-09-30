@@ -55,12 +55,23 @@ test('per-address rate limit counts before authentication and does not affect ot
   const { repo, app } = setup();
   const post = (remoteAddress: string, auth = 'Bearer wrong') => app.inject({ method: 'POST', url: '/api/ingest/dot', payload: payload(), headers: { authorization: auth }, remoteAddress });
   try {
-    for (let n = 0; n < DOT_RATE_LIMIT.perWindow; n++) assert.equal((await post('10.0.0.1')).statusCode, 401);
+    for (let n = 0; n < DOT_RATE_LIMIT.perAddress; n++) assert.equal((await post('10.0.0.1')).statusCode, 401);
     const limited = await post('10.0.0.1', `Bearer ${token}`);
     assert.equal(limited.statusCode, 429); assert.deepEqual(limited.json(), { ok: false, error: 'rate_limited' });
     assert.equal(limited.headers['retry-after'], '60'); assert.equal(limited.headers['cache-control'], 'no-store');
     assert.equal((await post('10.0.0.2', `Bearer ${token}`)).statusCode, 200);
     assert.equal(repo.calls, 1);
+  } finally { await app.close(); }
+});
+test('overall cap holds when a client rotates forged X-Forwarded-For under trustProxy', async () => {
+  const repo = new FakeRepository();
+  const app = Fastify({ logger: false, trustProxy: true });
+  registerDotIngest(app, { env: () => ({ DOT_INGEST_ENABLED: 'true', DOT_INGEST_TOKEN: token }), service: new DotIntakeService(repo, () => new Date(time)) });
+  const post = (n: number) => app.inject({ method: 'POST', url: '/api/ingest/dot', payload: payload(), headers: { authorization: 'Bearer wrong', 'x-forwarded-for': `203.0.113.${n % 250}, 10.1.${Math.floor(n / 250)}.1` }, remoteAddress: '10.0.0.9' });
+  try {
+    for (let n = 0; n < DOT_RATE_LIMIT.overall; n++) assert.equal((await post(n)).statusCode, 401, `request ${n}`);
+    assert.equal((await post(DOT_RATE_LIMIT.overall)).statusCode, 429);
+    assert.equal(repo.calls, 0);
   } finally { await app.close(); }
 });
 test('receipt and isolated payload preserve server observation, source and Dot times; HTML remains data', async () => {
