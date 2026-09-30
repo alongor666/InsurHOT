@@ -7,9 +7,10 @@
 
 InsurHOT 面向整个保险行业的公开信息空间，坚持 *Evidence first, opinion last*，服务人和 AI Agent。它不是保险热点站或新闻聚合站，也不是任何一家保险公司的内部经营系统。
 
-当前阶段：Phase 0 规划基线已验收；M0.2 固定上游快照已整合，固定HEAD已独立评审，仍Draft未合并。M0.3a 默认拒绝补丁已自检，待独立评审；所有付费外呼始终关闭。已验证 typecheck 和 web build；金额预算、品牌清理与完整应用CI尚未完成，应用未上线。
+当前阶段：Phase 0 规划基线已验收；M0.2 固定上游快照及M0.3a默认拒绝补丁均已阶段验证和独立复审，仍Draft未合并；所有付费外呼始终关闭。金额预算、品牌清理与完整应用CI尚未完成，应用未上线。Dot信息接入已规划，D1接收端已实现；真实Dot连接和公共投影尚未配置。
 
 - [开发行动计划](docs/development/action-plan.md)
+- [Dot 信息接入规划](docs/development/dot-integration-plan.md)
 - [上游基线及导入工具](UPSTREAM.md)
 - [项目实时台账](https://github.com/alongor666/InsurHOT/issues/3)
 
