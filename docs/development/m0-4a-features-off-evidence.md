@@ -35,7 +35,7 @@
 | `npm run build -w @aihot/web` | exit 0 | 未入库（与此前构建日志同形） |
 | `node --test tests/features-off.test.ts` | 4/4 | [`m0-4a-features-off-tests.log`](evidence/m0-4a-features-off-tests.log) |
 | `bash scripts/test-unlocked.sh` | 155/155（29 个文件，跳过付费闭锁挡住的 15 个用例） | [`m0-4a-unlocked.log`](evidence/m0-4a-unlocked.log) |
-| `node scripts/seed.ts`（全量） | 38 个 topic、18 个信源，`lb_models` 0 行 | [`m0-4a-seed.log`](evidence/m0-4a-seed.log) |
+| `node scripts/seed.ts`（全量，另建的一次性库 `insurhot_seed_test`，用后即删） | 38 个 topic、18 个信源，`lb_models` 0 行 | [`m0-4a-seed.log`](evidence/m0-4a-seed.log) |
 | `node scripts/smoke.ts --base http://127.0.0.1:3000`（本机 API + 已构建的 web） | all checks passed | [`m0-4a-smoke.log`](evidence/m0-4a-smoke.log) |
 
 变异检查：把两个开关改回 `true` 后，`tests/features-off.test.ts` 4 项全部失败（0 通过），还原后 4 项通过。测试因此确实依赖开关值，而非恒真。

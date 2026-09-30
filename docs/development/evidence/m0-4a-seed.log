@@ -1,7 +1,13 @@
+$ node scripts/migrate.ts   # fresh database insurhot_seed_test
+applied 0041_price_unit_precision.sql
+38 migration(s) applied
+$ node scripts/seed.ts
 topics: 38
 sources: 18 added, 0 already there
 exit=0
-$ psql -d insurhot_test -Atc "select count(*) from lb_models"
+$ psql -d insurhot_seed_test -Atc "select count(*) from lb_models"
 0
-$ psql -d insurhot_test -Atc "select count(*) from sources"
+$ psql -d insurhot_seed_test -Atc "select count(*) from sources"
+18
+$ psql -d insurhot_seed_test -Atc "select count(*) from topics"
 38
