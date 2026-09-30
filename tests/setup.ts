@@ -14,10 +14,14 @@ process.env.SESSION_SECRET ??= "test-session-secret-0123456789";
 process.env.IMG_PROXY_SIGN_SECRET ??= "test-img-secret-0123456789";
 process.env.FEISHU_CONTENT_PUSH_ENABLED = "false";
 process.env.INDEXNOW_SUBMIT_ENABLED = "false";
-// Collection is opted in for this test process only: every fetch target the tests use is a stub on
-// 127.0.0.1 started by the test itself, so the collection gate (M0.3a) sees an explicit, local-only
-// "true". Paid providers (LLM, embeddings, SocialData, Jina, Dajiala) stay behind the unconditional
-// paid lock until M0.3b; the test files that need them are listed in tests/paid-lock-blocked.txt.
+// Collection is opted in for this test process only, and only towards this host: every fetch target
+// the tests use is a stub on 127.0.0.1 started by the test itself. OUTBOUND_LOOPBACK_ONLY makes that a
+// rule the request layer enforces (by name before DNS, and again on the dialled address), because the
+// tests also set ALLOW_PRIVATE_NETWORK_FETCH, which would otherwise switch the SSRF guard off entirely
+// (tests/outbound-loopback.test.ts proves public names are refused). Paid providers (LLM, embeddings,
+// SocialData, Jina, Dajiala) stay behind the unconditional paid lock until M0.3b; the test files that
+// need them are listed in tests/paid-lock-blocked.txt.
+process.env.OUTBOUND_LOOPBACK_ONLY = "true";
 process.env.COLLECT_ENABLED = "true";
 process.env.LOG_LEVEL ??= "error";
 // The tests were written against the named model presets AIHOT assigns to each step (each provider is

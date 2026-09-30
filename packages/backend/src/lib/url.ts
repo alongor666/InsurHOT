@@ -1,6 +1,7 @@
 // URL normalisation for material identity, and the fetcher's network guard.
 import { lookup } from "node:dns/promises";
 import net from "node:net";
+import { isLoopbackHost } from "../outbound-policy.ts";
 
 const TRACKING_PARAMS = /^(utm_[a-z]+|spm|from|ref|ref_src|ref_url|source|share_source|share_token|fbclid|gclid|igshid|mc_cid|mc_eid|_hsenc|_hsmi|scene|chksm|sessionid|srcid|clicktime|enterid|mkt_tok)$/i;
 
@@ -191,6 +192,21 @@ type LookupCallback = (err: NodeJS.ErrnoException | null, address: string | Arra
  * DNS lookup for outbound sockets that refuses blocked addresses. Used as the connect-time lookup,
  * it closes the gap between the URL check and the connection (DNS rebinding).
  */
+/** Connect-time counterpart of assertLoopbackUrl: the dialled address itself must be loopback. */
+export function loopbackLookup(hostname: string, options: { all?: boolean; family?: number } | number, callback: LookupCallback): void {
+  const opts = typeof options === "number" ? { family: options } : options;
+  const refuse = () => callback(Object.assign(new Error(`Blocked non-loopback host ${hostname} (OUTBOUND_LOOPBACK_ONLY)`), { code: "EBLOCKED" }), opts.all ? [] : "", 0);
+  if (!isLoopbackHost(hostname)) return refuse();
+  lookup(hostname, { all: true, family: opts.family ?? 0 }).then(
+    (list) => {
+      if (list.length === 0 || list.some((a) => !isLoopbackHost(a.address))) return refuse();
+      if (opts.all) callback(null, list);
+      else callback(null, list[0]!.address, list[0]!.family);
+    },
+    (err: NodeJS.ErrnoException) => callback(err, opts.all ? [] : "", 0),
+  );
+}
+
 export function guardedLookup(hostname: string, options: { all?: boolean; family?: number } | number, callback: LookupCallback): void {
   const opts = typeof options === "number" ? { family: options } : options;
   if (blockedHostname(hostname.toLowerCase())) {
