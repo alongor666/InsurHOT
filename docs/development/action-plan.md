@@ -13,8 +13,9 @@
 | 顺序 | 交付与范围 | 通过条件 | 依赖/当前状态 |
 |---|---|---|---|
 | M0.1 | 固定上游清单、隔离导入工具、ADR-001、行动计划 | 489文件路径/模式/blob逐一验证；二进制及许可证保真；拒绝错误清单、覆盖目标、危险路径；工具CI | 已验收并通过[PR #5](https://github.com/alongor666/InsurHOT/pull/5)合入main：`46a411689780d251bd5f0161837d37813e04da30`；独立复审关闭M01-R01，bootstrap run 36641164748 attempt 3通过7项测试及清单验证 |
-| M0.2 | 把固定快照整合到项目，保留LICENSE/NOTICE/第三方许可 | 新增UPSTREAM.md记录实际映射；保留本仓README/AGENTS/Phase0；上游同名文档归档；品牌素材不得对外发布；依赖锁定；typecheck/web build | 固定489文件已整合；11项工具测试、逐文件blob/模式、typecheck及web build本地通过，待独立评审；[证据](m0-integration-evidence.md) |
-| M0.3 | 默认安全及预算硬边界 | 缺省/false/true；缺预算/未知价格/耗尽拒绝；并发预留、未知回执占用；本地假服务，零真实付费 | 待M0.2；先读所有调用入口，不能只改一个配置值 |
+| M0.2 | 把固定快照整合到项目，保留LICENSE/NOTICE/第三方许可 | 新增UPSTREAM.md记录实际映射；保留本仓README/AGENTS/Phase0；上游同名文档归档；品牌素材不得对外发布；依赖锁定；typecheck/web build | 固定489文件已整合；PR #6 固定HEAD `b9183a226e97e0f332d12c82ce96b8f11b2bc2c0` 已独立评审，仍保持Draft未合并；11项工具测试、逐文件blob/模式、typecheck及web build本地通过；[证据](m0-integration-evidence.md) |
+| M0.3a | 默认拒绝及预算前置闭锁 | 缺省/false/true/非法值；实际外呼边界（含手工/旧队列）门控；缺预算拒绝；付费全局无条件关闭 | PR #7 stacked在PR #6；作者定向测试/typecheck/build通过，待独立评审；[证据与盘点](m0-3a-evidence.md) |
+| M0.3b | 金额预算硬边界 | 批准价格/币种、全局及任务金额硬上限、原子并发预留、未知回执占用、恢复/降档不得越限 | 未开始；M0.3整体未完成，不移除付费闭锁、不自行批准金额 |
 | M0.4 | 品牌与可选模块清理 | 保留许可原名；重命名公开品牌；删除leaderboard/monitor前盘点路由、队列、导入、测试，删除后无悬空依赖 | 待M0.3；不借改名改变产品使命 |
 | M0.5 | 本仓应用CI与整体验收 | Node24 typecheck、web build/tests、临时PG迁移/seed/backend tests、Docker smoke；独立review绑定最终HEAD | 待前四项；本环境无PG/Docker，使用具备服务的CI环境验证 |
 

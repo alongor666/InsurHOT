@@ -1,3 +1,4 @@
+import { outboundFetch } from "../outbound-policy.ts";
 // OpenAI-compatible chat calls, always through receipts. One model is enough: `default` is whatever the
 // deployment names in LLM_BASE_URL / LLM_API_KEY / LLM_MODEL, and every capability uses it unless an
 // environment variable or the admin's model page picks one of the named presets below.
@@ -190,7 +191,7 @@ export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): P
       const started = Date.now();
       let res: Response;
       try {
-        res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+        res = await outboundFetch("model", `${baseUrl.replace(/\/$/, "")}/chat/completions`, {
           method: "POST",
           headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
           body: JSON.stringify(body),

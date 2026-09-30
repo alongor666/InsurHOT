@@ -1,3 +1,4 @@
+import { outboundFetch, explicitlyEnabled } from "../outbound-policy.ts";
 // Text embeddings through receipts, used only for the event grouping's candidate recall. Any
 // OpenAI-compatible /embeddings endpoint (EMBEDDING_BASE_URL, EMBEDDING_API_KEY, EMBEDDING_MODEL);
 // with a DashScope key and nothing else set, Aliyun text-embedding-v4 at 1024 dimensions. Without
@@ -28,7 +29,7 @@ function cacheFact(id: string, textHash: string, vector: number[]) {
 
 /** Embeddings are paid model calls: MODEL_CALLS_ENABLED=false switches them off like every other call. */
 export function embeddingsAvailable(): boolean {
-  return config.modelCallsEnabled && !!(credential("models", "EMBEDDING_API_KEY") ?? credential("models", "DASHSCOPE_API_KEY")) && process.env.EMBEDDINGS_ENABLED !== "false";
+  return config.modelCallsEnabled && !!(credential("models", "EMBEDDING_API_KEY") ?? credential("models", "DASHSCOPE_API_KEY")) && explicitlyEnabled("EMBEDDINGS_ENABLED");
 }
 
 async function embedBatch(texts: string[], subject: string): Promise<number[][]> {
@@ -39,7 +40,7 @@ async function embedBatch(texts: string[], subject: string): Promise<number[][]>
   const receipt = await paidRequest(
     { service: SERVICE, model: EMBEDDING_MODEL, purpose: "embedding", subject, identity: { model: EMBEDDING_MODEL, dims: EMBEDDING_DIMS, texts: texts.map((t) => sha256(t)) }, requestSummary: { count: texts.length } },
     async () => {
-      const res = await fetch(`${base.replace(/\/$/, "")}/embeddings`, {
+      const res = await outboundFetch("embeddings", `${base.replace(/\/$/, "")}/embeddings`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
         body: JSON.stringify({ model: EMBEDDING_MODEL, input: texts, ...(EMBEDDING_DIMS > 0 ? { dimensions: EMBEDDING_DIMS } : {}), encoding_format: "float" }),

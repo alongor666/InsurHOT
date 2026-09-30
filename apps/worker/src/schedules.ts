@@ -1,3 +1,4 @@
+import { explicitlyEnabled } from "@aihot/backend/outbound-policy";
 // Cron-style schedules (Asia/Shanghai). Each run is recorded in job_runs; missed slots run once.
 import type { PgBoss } from "pg-boss";
 import { FEATURES } from "@aihot/industry/features";
@@ -33,7 +34,7 @@ interface Scheduled {
   missed?: "skip" | "once";
 }
 
-const collecting = process.env.COLLECT_ENABLED !== "false";
+const collecting = explicitlyEnabled("COLLECT_ENABLED");
 
 export const SCHEDULES: Scheduled[] = [
   { name: "content.sweep", cron: "*/5 * * * *", run: sweepUnprocessed },

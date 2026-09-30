@@ -3,6 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { parseEnv } from "node:util";
+import { explicitlyEnabled } from "./outbound-policy.ts";
 import { SITE } from "@aihot/industry/site";
 
 export const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
@@ -43,8 +44,8 @@ export const config = {
   selectedVisibleAfterSeconds: int("SELECTED_VISIBLE_AFTER_SECONDS", 180),
   egressProxyUrl: env.EGRESS_PROXY_URL || null,
   allowPrivateNetworkFetch: bool("ALLOW_PRIVATE_NETWORK_FETCH", false),
-  feishuContentPushEnabled: bool("FEISHU_CONTENT_PUSH_ENABLED", false),
-  indexNowSubmitEnabled: bool("INDEXNOW_SUBMIT_ENABLED", false),
+  feishuContentPushEnabled: explicitlyEnabled("FEISHU_CONTENT_PUSH_ENABLED"),
+  indexNowSubmitEnabled: explicitlyEnabled("INDEXNOW_SUBMIT_ENABLED"),
   /** IndexNow key (32 hex characters); without one nothing is submitted and no key file is served. */
   indexNowKey: /^[0-9a-f]{32}$/.test(env.INDEXNOW_KEY ?? "") ? env.INDEXNOW_KEY! : null,
   imgProxyRequireSig: bool("IMG_PROXY_REQUIRE_SIG", true),
@@ -53,8 +54,8 @@ export const config = {
   dataDir: str("AIHOT_DATA_DIR", path.join(REPO_ROOT, ".data")),
   // Name of this deployment in alerts ("production" sends them without a prefix).
   environmentName: str("AIHOT_ENVIRONMENT", isProduction ? "production" : "development"),
-  // Model calls are live unless explicitly disabled (tests, replays).
-  modelCallsEnabled: bool("MODEL_CALLS_ENABLED", true),
+  // Explicit opt-in; paid outbound remains blocked by the M0.3a integration guard.
+  modelCallsEnabled: explicitlyEnabled("MODEL_CALLS_ENABLED"),
   devAdmin: env.DEV_AUTH_ROLE === "admin" ? { displayName: env.DEV_AUTH_DISPLAY_NAME || "Dev Admin" } : null,
   /** The admin password (at least 12 characters). Feishu sign-in below is optional. */
   adminPassword: env.ADMIN_PASSWORD || null,

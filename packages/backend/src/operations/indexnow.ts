@@ -1,3 +1,4 @@
+import { outboundFetch } from "../outbound-policy.ts";
 // Daily IndexNow submission of newly indexable URLs. INDEXNOW_SUBMIT_ENABLED is the safety valve: off
 // (the default) the list is computed and recorded but nothing is sent. Needs INDEXNOW_KEY.
 import { config } from "../config.ts";
@@ -23,7 +24,7 @@ export async function submitIndexNow(now = new Date()) {
   let httpStatus: number | null = null;
   const key = config.indexNowKey;
   if (urls.length && config.indexNowSubmitEnabled && key) {
-    const res = await fetch("https://api.indexnow.org/indexnow", {
+    const res = await outboundFetch("indexNow", "https://api.indexnow.org/indexnow", {
       method: "POST",
       headers: { "content-type": "application/json; charset=utf-8" },
       body: JSON.stringify({ host: new URL(config.siteUrl).host, key, keyLocation: siteUrl(`/${key}.txt`), urlList: urls }),

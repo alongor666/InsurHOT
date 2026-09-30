@@ -1,3 +1,4 @@
+import { explicitlyEnabled } from "../outbound-policy.ts";
 // Operations alerts. The person reading them is the site owner, not an engineer: each
 // message says what readers see, whether it heals by itself and what, if anything, the owner must do.
 //   now    — readers are affected and it has not healed: sent at once, repeated hourly, recovery reported.
@@ -11,8 +12,8 @@ import { backupConfigured } from "./backup.ts";
 
 const REPEAT_MS: Record<Exclude<Level, "digest">, number> = { now: 3600_000, today: 24 * 3600_000 };
 
-const collecting = () => process.env.COLLECT_ENABLED !== "false";
-const modelsOn = () => process.env.MODEL_CALLS_ENABLED !== "false";
+const collecting = () => explicitlyEnabled("COLLECT_ENABLED");
+const modelsOn = () => explicitlyEnabled("MODEL_CALLS_ENABLED");
 /** How long the site may go without a new article before it counts as stalled (small source lists are quieter). */
 const QUIET_MS = Number(process.env.ALERT_QUIET_MINUTES || 360) * 60_000;
 
