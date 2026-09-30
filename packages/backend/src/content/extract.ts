@@ -7,6 +7,7 @@ import { guardedFetch } from "../lib/http-fetch.ts";
 import { collapseWhitespace, stripTags } from "../lib/text.ts";
 import { jinaRead } from "../providers/jina.ts";
 import { BudgetExceededError } from "../providers/receipts.ts";
+import { MoneyRefusedError } from "../providers/money.ts";
 import { sanitizeBody, trimTrailingChrome } from "./sanitize.ts";
 import { contentHash } from "./materials.ts";
 
@@ -86,6 +87,11 @@ export async function extractFromUrl(url: string, opts: { allowJina: boolean; su
     return { html, text, images: [], via: "jina" };
   } catch (error) {
     if (error instanceof BudgetExceededError) return null;
+    if (error instanceof MoneyRefusedError) {
+      // The fallback is given up, as with a full count window; the article is judged on what it has.
+      console.warn(JSON.stringify({ level: "warn", msg: "Jina body fallback refused by the monetary limits", reason: error.reason, subject: opts.subject ?? null }));
+      return null;
+    }
     throw error;
   }
 }

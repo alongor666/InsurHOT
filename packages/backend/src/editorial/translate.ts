@@ -11,6 +11,7 @@ import { z } from "zod";
 import { sql } from "../db.ts";
 import { sanitizeBody } from "../content/sanitize.ts";
 import { chatJson } from "../providers/llm.ts";
+import { MoneyRefusedError } from "../providers/money.ts";
 import { modelFor } from "./models.ts";
 import { shutdownSignal } from "../jobs/queue.ts";
 import { promptText, promptVersion } from "./prompts.ts";
@@ -239,8 +240,9 @@ export async function translatePending(opts: { limit?: number; budgetMs?: number
       // in receipts and are reused next run; do not mark an interrupted article terminal/partial.
       if (error instanceof TranslationInterruptedError) break;
       const message = (error as Error).message;
-      // Switched-off model calls or an exhausted budget: stop this run without counting an attempt.
-      if (/disabled|not configured|budget/i.test(message)) break;
+      // Switched-off model calls, a full count window or a refusal by the monetary limits: stop this
+      // run without counting an attempt.
+      if (error instanceof MoneyRefusedError || /disabled|not configured|budget/i.test(message)) break;
       done.push({ articleId: r.article_id, status: "skipped", reason: message.slice(0, 200) });
       outcome = "failed";
       reason = message.slice(0, 300);

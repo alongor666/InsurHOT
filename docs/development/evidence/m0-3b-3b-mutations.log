@@ -1,0 +1,46 @@
+## no mutation (run twice on the same database)
+ℹ pass 8
+ℹ fail 0
+ℹ pass 8
+ℹ fail 0
+## mutation: a refused article is handled like any other failure (main's behaviour)
+✖ an article the limits refused stops as budget_blocked: no retry time, no attempt counted, and the safety net leaves it alone
+✖ an admin resumes what was stopped, a bounded number per call, newest articles first; nothing resumes by itself
+✖ the owner is told once a day that work is stopped by the limits; over the admin API it is listed and resumed
+ℹ pass 5
+ℹ fail 3
+## mutation: the safety net also queues budget_blocked articles
+✖ an article the limits refused stops as budget_blocked: no retry time, no attempt counted, and the safety net leaves it alone
+ℹ pass 7
+ℹ fail 1
+## mutation: a refused grouping job is thrown back to the queue (main's behaviour)
+✖ a grouping or digest job the limits refused ends normally and is recorded; every other failure is left to the queue
+✖ an admin resumes what was stopped, a bounded number per call, newest articles first; nothing resumes by itself
+✖ the owner is told once a day that work is stopped by the limits; over the admin API it is listed and resumed
+ℹ pass 5
+ℹ fail 3
+## mutation: a blocked report is composed again every time
+✖ a report the limits refused is recorded and not composed again until it is resumed; other failures still throw
+ℹ pass 7
+ℹ fail 1
+## mutation: the warm-up treats a refusal as any other error (main's behaviour: throws)
+✖ the embedding warm-up waits through a full count window and stops at once on a refusal by the limits
+ℹ pass 7
+ℹ fail 1
+## mutation: any refusal by the limits is asked again without the image
+✖ only an image without a verified price, or an image the model refused, is answered by asking again without it; a used-up month is not
+ℹ pass 7
+ℹ fail 1
+## mutation: a resume call is not bounded for grouping, digests and reports
+✖ an admin resumes what was stopped, a bounded number per call, newest articles first; nothing resumes by itself
+ℹ pass 7
+ℹ fail 1
+## mutation: resume takes the oldest articles first
+✖ an admin resumes what was stopped, a bounded number per call, newest articles first; nothing resumes by itself
+✖ the owner is told once a day that work is stopped by the limits; over the admin API it is listed and resumed
+ℹ pass 6
+ℹ fail 2
+## mutation: stopped work raises no alert
+✖ the owner is told once a day that work is stopped by the limits; over the admin API it is listed and resumed
+ℹ pass 7
+ℹ fail 1

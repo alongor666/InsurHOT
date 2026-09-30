@@ -13,6 +13,7 @@ import { REPO_ROOT } from "@aihot/backend/config";
 import { closeDb, sql } from "@aihot/backend/db";
 import { ANALYZE_PROMPT_VERSION, normalizeAnalysis, runAnalysis, type AnalyzeInputArticle } from "@aihot/backend/editorial/analyze";
 import { importSelectBenchRun } from "@aihot/backend/admin/selectbench";
+import { MoneyRefusedError } from "@aihot/backend/providers/money";
 
 const { values } = parseArgs({
   options: {
@@ -88,6 +89,8 @@ for (const model of values.models!.split(",")) {
       const out = normalizeAnalysis(res);
       return { r, out, receiptIds: [res.prefilter.receiptId, ...(res.scores?.receiptIds ?? [])], error: null as string | null };
     } catch (error) {
+      // Refused by the monetary limits: every further case would be too, and a run cut short must not be imported as a result.
+      if (error instanceof MoneyRefusedError) throw error;
       return { r, out: null, receiptIds: [] as number[], error: String(error).slice(0, 200) };
     }
   });

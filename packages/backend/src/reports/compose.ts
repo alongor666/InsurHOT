@@ -9,6 +9,7 @@ import { modelFor } from "../editorial/models.ts";
 import { addDays, beijingDate, beijingMidnight, isoWeekLabel, isoWeekRange } from "@aihot/contracts/time";
 import { sql } from "../db.ts";
 import { chatJson } from "../providers/llm.ts";
+import { blockForBudget, isBudgetBlocked, refusedByMoney } from "../jobs/budget-blocked.ts";
 import { completeReceipt } from "../providers/receipts.ts";
 import { shutdownSignal } from "../jobs/queue.ts";
 
@@ -123,8 +124,30 @@ async function saveReport(kind: "daily" | "weekly" | "monthly", key: string, sta
   });
 }
 
+export interface Composed { key: string; entries: number; budgetBlocked?: true }
+
+/**
+ * A report the monetary limits refused is recorded and left: the schedule and the hourly catch-up skip
+ * it until an admin resumes it (ADR-015 section 8), instead of asking again every hour of the month.
+ */
+export async function unlessBudgetBlocked(kind: "daily" | "weekly" | "monthly", key: string, compose: () => Promise<Composed>): Promise<Composed> {
+  const ref = `${kind}:${key}`;
+  if (await isBudgetBlocked("report", ref)) return { key, entries: 0, budgetBlocked: true };
+  try {
+    return await compose();
+  } catch (error) {
+    if (!refusedByMoney(error)) throw error;
+    await blockForBudget("report", ref, error);
+    return { key, entries: 0, budgetBlocked: true };
+  }
+}
+
 /** Daily report for Beijing date D covers [D-1 08:00, D 08:00) Beijing time. */
-export async function composeDaily(date: string, reason = "scheduled"): Promise<{ key: string; entries: number }> {
+export function composeDaily(date: string, reason = "scheduled"): Promise<Composed> {
+  return unlessBudgetBlocked("daily", date, () => composeDailyNow(date, reason));
+}
+
+async function composeDailyNow(date: string, reason: string): Promise<Composed> {
   const end = new Date(beijingMidnight(date).getTime() + 8 * 3600 * 1000);
   const start = new Date(end.getTime() - 86400000);
   const covered = await recentlyCovered("daily", date);
@@ -187,7 +210,11 @@ export function periodPrompt(kind: "weekly" | "monthly", startDate: string, endD
   };
 }
 
-async function composePeriod(kind: "weekly" | "monthly", key: string, startDate: string, endDateInclusive: string, reason: string) {
+function composePeriod(kind: "weekly" | "monthly", key: string, startDate: string, endDateInclusive: string, reason: string): Promise<Composed> {
+  return unlessBudgetBlocked(kind, key, () => composePeriodNow(kind, key, startDate, endDateInclusive, reason));
+}
+
+async function composePeriodNow(kind: "weekly" | "monthly", key: string, startDate: string, endDateInclusive: string, reason: string): Promise<Composed> {
   const start = beijingMidnight(startDate);
   const end = beijingMidnight(addDays(endDateInclusive, 1));
   const all = await candidates(start, end);
@@ -260,8 +287,7 @@ export async function catchUpReports(now = new Date(), days = 7): Promise<{ gene
     if (first?.key && d < first.key) continue;
     const [exists] = await sql`SELECT 1 FROM reports WHERE kind = 'daily' AND key = ${d}`;
     if (!exists) {
-      await composeDaily(d, "catch-up");
-      generated.push(`daily:${d}`);
+      if (!(await composeDaily(d, "catch-up")).budgetBlocked) generated.push(`daily:${d}`);
     }
   }
   // Last complete ISO week (Monday 10:00 onwards).
@@ -271,8 +297,7 @@ export async function catchUpReports(now = new Date(), days = 7): Promise<{ gene
   if (weekDue) {
     const [w] = await sql`SELECT 1 FROM reports WHERE kind = 'weekly' AND key = ${lastWeek}`;
     if (!w) {
-      await composeWeekly(lastWeek, "catch-up");
-      generated.push(`weekly:${lastWeek}`);
+      if (!(await composeWeekly(lastWeek, "catch-up")).budgetBlocked) generated.push(`weekly:${lastWeek}`);
     }
   }
   // Last complete month (1st 10:30 onwards).
@@ -282,8 +307,7 @@ export async function catchUpReports(now = new Date(), days = 7): Promise<{ gene
   if (monthDue) {
     const [m] = await sql`SELECT 1 FROM reports WHERE kind = 'monthly' AND key = ${prevMonth}`;
     if (!m) {
-      await composeMonthly(prevMonth, "catch-up");
-      generated.push(`monthly:${prevMonth}`);
+      if (!(await composeMonthly(prevMonth, "catch-up")).budgetBlocked) generated.push(`monthly:${prevMonth}`);
     }
   }
   return { generated };

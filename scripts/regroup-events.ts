@@ -86,6 +86,8 @@ async function plan() {
   // queue does not stall on them.
   const warmed = await warmRecallWindow((done, total) => { if (done % 1000 === 0 || done === total) console.log(`embedding ${done}/${total}`); });
   console.log(JSON.stringify({ warmed, cancelledJobs: waiting.length }));
+  // The monetary limits refused the embeddings: grouping the backlog would be refused the same way.
+  if (warmed.refused) throw new Error(`regroup stopped before queueing anything: ${warmed.refused}`);
   await sql`INSERT INTO regroup_pending (article_id) SELECT unnest(${[...ids, ...signals]}::text[]) ON CONFLICT (article_id) DO UPDATE SET requested_at = now()`;
   let sent = 0;
   for (const id of ids) if (await enqueue(QUEUES.group, { articleId: id, force: true }, { singletonKey: `regroup:${id}`, priority: -2 })) sent++;

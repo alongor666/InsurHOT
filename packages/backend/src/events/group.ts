@@ -20,6 +20,7 @@ import { newShortId, newUuid, sha256 } from "../lib/ids.ts";
 import { chatJson } from "../providers/llm.ts";
 import { BudgetExceededError, ReceiptBusyError, completeReceipt } from "../providers/receipts.ts";
 import { embeddingsAvailable, ensureEmbeddings } from "../providers/embeddings.ts";
+import { MoneyRefusedError } from "../providers/money.ts";
 import { isHistorical, STALE_ON_DISCOVERY_MS } from "../content/materials.ts";
 import { enqueue, QUEUES } from "../jobs/queue.ts";
 import { publishArticle } from "../publication/publish.ts";
@@ -149,10 +150,12 @@ async function vectorsFor(items: Array<{ id: string; text: string }>): Promise<M
 
 /**
  * Embeds every report of the recall window that has no stored vector yet, within the embedding
- * budget (waiting when it is exhausted). Run before a deploy that changes the embedded text or
- * before a regroup, so the first grouping job does not spend its retries on the backlog.
+ * budget (waiting when its count window is full). Run before a deploy that changes the embedded text
+ * or before a regroup, so the first grouping job does not spend its retries on the backlog. A refusal
+ * by the monetary limits is not waited for: the run ends there and says so in `refused`, with the
+ * number embedded so far.
  */
-export async function warmRecallWindow(onProgress?: (done: number, total: number) => void): Promise<{ total: number; embedded: number }> {
+export async function warmRecallWindow(onProgress?: (done: number, total: number) => void): Promise<{ total: number; embedded: number; refused?: string }> {
   if (!embeddingsAvailable()) return { total: 0, embedded: 0 };
   // Reports waiting for a regroup included: each counts again once its turn comes.
   const ids = [...new Set((await recallPool(true)).map((r) => r.article_id))];
@@ -165,21 +168,35 @@ export async function warmRecallWindow(onProgress?: (done: number, total: number
   let done = 0;
   for (let i = 0; i < missing.length; i += 100) {
     const batch = missing.slice(i, i + 100);
-    for (;;) {
-      try {
-        await ensureEmbeddings("article", batch);
-        break;
-      } catch (error) {
-        // The worker may be embedding the same texts for a live grouping job: that batch is covered.
-        if (error instanceof ReceiptBusyError) break;
-        if (!(error instanceof BudgetExceededError)) throw error;
-        await new Promise((r) => setTimeout(r, (error.retryAfterSeconds + 1) * 1000));
-      }
-    }
+    const { refused } = await embedBatchWaiting(batch);
+    if (refused) return { total: items.length, embedded: done, refused };
     done += batch.length;
     onProgress?.(done, missing.length);
   }
   return { total: items.length, embedded: missing.length };
+}
+
+/**
+ * One batch of the warm-up. A full count window is waited for and the batch sent again; a refusal by
+ * the monetary limits is returned at once, since no wait ends it (ADR-015 section 8).
+ */
+export async function embedBatchWaiting(
+  batch: Array<{ id: string; text: string }>,
+  embed: (kind: "article", items: Array<{ id: string; text: string }>) => Promise<unknown> = ensureEmbeddings,
+  sleep: (ms: number) => Promise<unknown> = (ms) => new Promise((r) => setTimeout(r, ms)),
+): Promise<{ refused?: string }> {
+  for (;;) {
+    try {
+      await embed("article", batch);
+      return {};
+    } catch (error) {
+      // The worker may be embedding the same texts for a live grouping job: that batch is covered.
+      if (error instanceof ReceiptBusyError) return {};
+      if (error instanceof MoneyRefusedError) return { refused: error.message };
+      if (!(error instanceof BudgetExceededError)) throw error;
+      await sleep((error.retryAfterSeconds + 1) * 1000);
+    }
+  }
 }
 
 function cosine32(a: Float32Array, b: Float32Array): number {
