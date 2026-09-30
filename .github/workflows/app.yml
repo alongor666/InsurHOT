@@ -67,8 +67,10 @@ jobs:
           web=$!
           for i in $(seq 1 60); do curl -fsS -o /dev/null http://127.0.0.1:3000/api/health 2>/dev/null && break; sleep 1; done
           node scripts/smoke.ts --base http://127.0.0.1:3000
-          # The backend tests that follow get the database and the ports to themselves.
+          # The backend tests that follow get the database and the ports to themselves: both servers close
+          # their connections on SIGTERM, so wait until they have exited.
           kill "$api" "$web"
+          wait "$api" "$web" || true
       - name: Backend tests (paid-lock-blocked files and cases excluded, see tests/paid-lock-blocked*.txt)
         run: bash scripts/test-unlocked.sh
       - name: Server logs
