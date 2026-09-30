@@ -47,11 +47,15 @@ export function assertPaidOutboundDisabled(): void {
   throw new PaidOutboundDisabledError("Paid outbound disabled until M0.3b monetary hard limits, approved prices and atomic reservations are implemented");
 }
 
+// The fetch this module loaded with. A test that replaces globalThis.fetch with a double is not
+// reaching the network, so loopback-only does not apply to it; the real fetch is always checked.
+const nativeFetch = globalThis.fetch;
+
 /** Used by direct HTTP integrations, immediately before their actual network call. */
 export async function outboundFetch(purpose: OutboundPurpose, input: string | URL, init?: RequestInit): Promise<Response> {
   assertOutboundEnabled(purpose);
   if (purpose === "model" || purpose === "embeddings") assertPaidOutboundDisabled();
-  if (loopbackOnly()) assertLoopbackUrl(input);
+  if (loopbackOnly() && globalThis.fetch === nativeFetch) assertLoopbackUrl(input);
   // Fixed integration endpoints do not need redirects; forbid automatic follow and caller overrides.
   return fetch(input, { ...init, redirect: "error" });
 }

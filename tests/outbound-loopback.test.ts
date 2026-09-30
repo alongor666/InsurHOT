@@ -40,9 +40,18 @@ test("guarded collection reaches a local stub but refuses a public name and a re
   } finally { await Promise.all([away.close(), local.close()]); }
 });
 
-test("direct integrations refuse non-loopback targets before calling fetch", async () => {
+test("direct integrations refuse non-loopback targets before calling fetch, unless fetch is a test double", async () => {
   await assert.rejects(outboundFetch("collect", "http://example.com/v1"), /OUTBOUND_LOOPBACK_ONLY/);
   await assert.rejects(outboundFetch("collect", new URL("http://198.51.100.1/")), /OUTBOUND_LOOPBACK_ONLY/);
+  // tests/feedback.test.ts replaces globalThis.fetch for open.feishu.cn; a double is not the network.
+  const real = globalThis.fetch;
+  let seen = "";
+  globalThis.fetch = (async (input: string | URL | Request) => { seen = String(input); return new Response("{}", { status: 200 }); }) as typeof fetch;
+  try {
+    const res = await outboundFetch("collect", "https://open.feishu.cn/open-apis/x");
+    assert.equal(res.status, 200); assert.equal(seen, "https://open.feishu.cn/open-apis/x");
+  } finally { globalThis.fetch = real; }
+  await assert.rejects(outboundFetch("collect", "https://open.feishu.cn/open-apis/x"), /OUTBOUND_LOOPBACK_ONLY/);
 });
 
 test("the connect-time lookup refuses non-loopback names and non-loopback answers", async () => {
