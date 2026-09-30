@@ -1,0 +1,24 @@
+38 migration(s) applied
+## rows in the tables and settings to be removed, and one in a table that stays
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 4
+INSERT 0 1
+INSERT 0 1
+lb_models rows: 1
+lb_aliases rows: 1
+monitor_state rows: 1
+settings keys: leaderboard.fetch, leaderboard.last_check, models.monitor, models.score
+inserts exit=0
+$ node scripts/migrate.ts
+applied 0042_drop_leaderboard_monitor.sql
+1 migration(s) applied
+exit=0
+tables left matching lb_*/monitor_*/fx_rates: 0
+kept tables: deliveries, delivery_leases, notify_targets
+notify_targets rows with key t1: 1
+settings keys: models.score
+open alerts left in alerts.state: backup.stale
+$ node scripts/migrate.ts   # again
+database is up to date

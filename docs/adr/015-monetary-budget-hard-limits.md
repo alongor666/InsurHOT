@@ -2,6 +2,8 @@
 
 状态：Proposed（2026-09-30，Claude 会话起草；经两轮独立对抗评审后修订）。主规格 ADR-015「模型路由 R0–R3 + H；升级条件；月度金额预算」分两部分：**本文件只裁决金额预算机制**（M0.3b，#11）；R0–R3 路由与升级条件留待 T2/T4。按 `docs/phase0/delivery-gates.md` §5：技术方案由实施者起草，**金额、币种、价格与用途由 owner 批准**；本文件不批准任何支出，未列出的数值一律视为零。Refs #4、#11、#15；上游行为见 `docs/development/m0-3a-evidence.md`。
 
+> 2026-09-30 补记：ADR-002 第 2 步已删除 leaderboard 与 Codex 重置监控。`assertPaidOutboundDisabled()` 的调用点因此由四个变为三个（`artificial-analysis.ts` 已不存在），`monitor` capability 与 `x` 主体类别已从代码移除。下文凡涉及它们的行按「已删除」读；正文是 `8b4526a` 时的现状记录，未逐行改写。
+
 ## 背景：现状（main `8b4526a`）
 
 ### 付费出口不止一处

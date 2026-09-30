@@ -71,8 +71,8 @@ export async function modelCapabilities(): Promise<Map<string, string>> {
 }
 
 /**
- * The capability whose limit a request counts against: by service for the collectors (so SocialData's
- * "monitor.context" is collection, not the monitor model), "embedding" for embeddings, by purpose for models.
+ * The capability whose limit a request counts against: by service for the collectors, whatever purpose
+ * they send, "embedding" for embeddings, by purpose for models.
  */
 export function capabilityFor(service: string, purpose: string, purposes: Map<string, string>): string {
   const collect = COLLECT_SERVICES[service];
@@ -90,7 +90,7 @@ const ARTICLE = /^article:[A-Za-z0-9_-]{1,80}$/;
 const ARTICLE_FACT = /^(article:[A-Za-z0-9_-]{1,80}):fact:\d+$/;
 const STORY = /^story:\d+$/;
 const STORY_PAIR = /^story:(\d+):(\d+)$/;
-const OTHER = /^(?:quote:\d+|x:\d+|report:(?:daily|weekly|monthly):[0-9A-Za-z-]{1,20})$/;
+const OTHER = /^(?:quote:\d+|report:(?:daily|weekly|monthly):[0-9A-Za-z-]{1,20})$/;
 
 /**
  * The subjects a model step counts against. `article:a1@4#2` and `article:a1:fact:9` are `article:a1`; a

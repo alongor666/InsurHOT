@@ -88,13 +88,12 @@ test("capabilities: collectors by service, embeddings by purpose, models by purp
   assert.equal(capabilityFor("dashscope", "embedding", purposes), "embedding");
   assert.equal(capabilityFor("jina", "body_fallback", purposes), "collect.jina");
   assert.equal(capabilityFor("dajiala", "mp_history", purposes), "collect.dajiala");
-  // SocialData sends "monitor.context" too: it is collection money, not the monitor model's.
-  assert.equal(capabilityFor("socialdata", "monitor.context", purposes), "collect.socialdata");
-  assert.equal(capabilityFor("zhipu", "monitor.context", purposes), "monitor");
+  // A collector is collection money whatever purpose it sends, even a model step's.
+  assert.equal(capabilityFor("socialdata", "translate_quoted", purposes), "collect.socialdata");
   assert.throws(() => capabilityFor("zhipu", "something_new", purposes), refused("unmapped_purpose"));
 
   // Every purpose under packages/backend/src is a model purpose with a capability, or one only collectors use.
-  const collectorOnly = new Set(["mp_history", "mp_article", "source_fetch", "source_listing", "source_detail", "body_fallback", "x_article", "monitor.scan", "monitor.lookback"]);
+  const collectorOnly = new Set(["mp_history", "mp_article", "source_fetch", "source_listing", "source_detail", "body_fallback", "x_article"]);
   const literals = new Set<string>();
   const templates = new Set<string>();
   const walk = (dir: string) => {
@@ -130,14 +129,13 @@ test("subjects: revisions, fragments and the fact suffix fold into the subject; 
     ["report", "report:daily:2031-01-05", ["report:daily:2031-01-05"]],
     ["report", "report:weekly:2031-W05", ["report:weekly:2031-W05"]],
     ["translate", "quote:1900000000000000001", ["quote:1900000000000000001"]],
-    ["monitor", "x:1900000000000000002", ["x:1900000000000000002"]],
     ["collect.jina", "source:abc", []],
     ["collect.dajiala", "bare-source-id", []],
     ["embedding", "article:first-of-batch", []],
   ];
   for (const [capability, subject, keys] of cases) assert.deepEqual(subjectKeysFor(capability, subject), keys, `${capability} ${subject}`);
   const bad = ["", null, undefined, "no-kind", "@4", ":x", "Article:a1", "article: a1", "article:a1:fact:2:fact:3", "article:a1:extra", "story:1:2:3", "story:x",
-    "story:1:fact:2", "report:yearly:2031", "source:abc", "x:abc", "quote:"];
+    "story:1:fact:2", "report:yearly:2031", "source:abc", "x:abc", "x:1900000000000000002", "quote:"];
   for (const subject of bad) assert.throws(() => subjectKeysFor("score", subject), refused("missing_subject"), String(subject));
 });
 
