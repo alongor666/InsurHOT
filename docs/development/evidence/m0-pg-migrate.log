@@ -34,3 +34,4 @@ applied 0036_open_source_defaults.sql
 applied 0037_x_article.sql
 applied 0038_quote_translations.sql
 35 migration(s) applied
+exit=0

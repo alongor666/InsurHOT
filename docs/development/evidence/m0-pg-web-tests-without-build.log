@@ -1,0 +1,265 @@
+✖ public route subsets produce the same complete navigation data; filters still differ (183.704792ms)
+✖ HTML and navigation share freshness; cookies do not personalize public results (0.51725ms)
+✖ missing routes cannot be hidden by a root-only request; errors and redirects stay uncached (0.036625ms)
+✖ admin data and actions never become public cache entries (0.025583ms)
+✖ an elapsed release deadline cannot be extended by a fresh page/data response (0.053375ms)
+✖ browser freshness shares the selected deadline, including slow sibling loaders (0.022875ms)
+✖ the edge may keep a page longer than browsers, which a withdrawal purge cannot reach (0.023ms)
+✖ browser caching preserves noindex and private sign-in responses (0.023292ms)
+✖ a visitor cannot name its own address to the api without a trusted proxy in front (0.035625ms)
+✔ public and admin loaders forward cancellation without turning it into a 503 (34.299917ms)
+✔ history cache batches writes and survives eviction, expiry and storage denial (68.000584ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 2
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 421.85275
+
+✖ failing tests:
+
+test at apps/web/tests/cache.test.ts:79:1
+✖ public route subsets produce the same complete navigation data; filters still differ (183.704792ms)
+  Error: web exited: node:internal/modules/esm/resolve:275
+      throw new ERR_MODULE_NOT_FOUND(
+            ^
+  
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<repo>/apps/web/build/server/index.js' imported from <repo>/apps/web/server.ts
+      at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+      at moduleResolve (node:internal/modules/esm/resolve:865:10)
+      at defaultResolve (node:internal/modules/esm/resolve:991:11)
+      at #cachedDefaultResolve (node:internal/modules/esm/loader:713:20)
+      at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:730:38)
+      at ModuleLoader.resolveSync (node:internal/modules/esm/loader:759:52)
+      at #resolve (node:internal/modules/esm/loader:695:17)
+      at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:615:35)
+      at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:32)
+      at TracingChannel.tracePromise (node:diagnostics_channel:350:14) {
+    code: 'ERR_MODULE_NOT_FOUND',
+    url: 'file://<repo>/apps/web/build/server/index.js'
+  }
+  
+  Node.js v25.5.0
+  
+      at ChildProcess.<anonymous> (file://<repo>/apps/web/tests/cache.test.ts:56:58)
+      at ChildProcess.emit (node:events:508:20)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+
+test at apps/web/tests/cache.test.ts:98:1
+✖ HTML and navigation share freshness; cookies do not personalize public results (0.51725ms)
+  Error: web exited: node:internal/modules/esm/resolve:275
+      throw new ERR_MODULE_NOT_FOUND(
+            ^
+  
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<repo>/apps/web/build/server/index.js' imported from <repo>/apps/web/server.ts
+      at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+      at moduleResolve (node:internal/modules/esm/resolve:865:10)
+      at defaultResolve (node:internal/modules/esm/resolve:991:11)
+      at #cachedDefaultResolve (node:internal/modules/esm/loader:713:20)
+      at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:730:38)
+      at ModuleLoader.resolveSync (node:internal/modules/esm/loader:759:52)
+      at #resolve (node:internal/modules/esm/loader:695:17)
+      at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:615:35)
+      at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:32)
+      at TracingChannel.tracePromise (node:diagnostics_channel:350:14) {
+    code: 'ERR_MODULE_NOT_FOUND',
+    url: 'file://<repo>/apps/web/build/server/index.js'
+  }
+  
+  Node.js v25.5.0
+  
+      at ChildProcess.<anonymous> (file://<repo>/apps/web/tests/cache.test.ts:56:58)
+      at ChildProcess.emit (node:events:508:20)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+
+test at apps/web/tests/cache.test.ts:114:1
+✖ missing routes cannot be hidden by a root-only request; errors and redirects stay uncached (0.036625ms)
+  Error: web exited: node:internal/modules/esm/resolve:275
+      throw new ERR_MODULE_NOT_FOUND(
+            ^
+  
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<repo>/apps/web/build/server/index.js' imported from <repo>/apps/web/server.ts
+      at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+      at moduleResolve (node:internal/modules/esm/resolve:865:10)
+      at defaultResolve (node:internal/modules/esm/resolve:991:11)
+      at #cachedDefaultResolve (node:internal/modules/esm/loader:713:20)
+      at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:730:38)
+      at ModuleLoader.resolveSync (node:internal/modules/esm/loader:759:52)
+      at #resolve (node:internal/modules/esm/loader:695:17)
+      at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:615:35)
+      at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:32)
+      at TracingChannel.tracePromise (node:diagnostics_channel:350:14) {
+    code: 'ERR_MODULE_NOT_FOUND',
+    url: 'file://<repo>/apps/web/build/server/index.js'
+  }
+  
+  Node.js v25.5.0
+  
+      at ChildProcess.<anonymous> (file://<repo>/apps/web/tests/cache.test.ts:56:58)
+      at ChildProcess.emit (node:events:508:20)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+
+test at apps/web/tests/cache.test.ts:130:1
+✖ admin data and actions never become public cache entries (0.025583ms)
+  Error: web exited: node:internal/modules/esm/resolve:275
+      throw new ERR_MODULE_NOT_FOUND(
+            ^
+  
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<repo>/apps/web/build/server/index.js' imported from <repo>/apps/web/server.ts
+      at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+      at moduleResolve (node:internal/modules/esm/resolve:865:10)
+      at defaultResolve (node:internal/modules/esm/resolve:991:11)
+      at #cachedDefaultResolve (node:internal/modules/esm/loader:713:20)
+      at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:730:38)
+      at ModuleLoader.resolveSync (node:internal/modules/esm/loader:759:52)
+      at #resolve (node:internal/modules/esm/loader:695:17)
+      at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:615:35)
+      at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:32)
+      at TracingChannel.tracePromise (node:diagnostics_channel:350:14) {
+    code: 'ERR_MODULE_NOT_FOUND',
+    url: 'file://<repo>/apps/web/build/server/index.js'
+  }
+  
+  Node.js v25.5.0
+  
+      at ChildProcess.<anonymous> (file://<repo>/apps/web/tests/cache.test.ts:56:58)
+      at ChildProcess.emit (node:events:508:20)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+
+test at apps/web/tests/cache.test.ts:143:1
+✖ an elapsed release deadline cannot be extended by a fresh page/data response (0.053375ms)
+  Error: web exited: node:internal/modules/esm/resolve:275
+      throw new ERR_MODULE_NOT_FOUND(
+            ^
+  
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<repo>/apps/web/build/server/index.js' imported from <repo>/apps/web/server.ts
+      at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+      at moduleResolve (node:internal/modules/esm/resolve:865:10)
+      at defaultResolve (node:internal/modules/esm/resolve:991:11)
+      at #cachedDefaultResolve (node:internal/modules/esm/loader:713:20)
+      at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:730:38)
+      at ModuleLoader.resolveSync (node:internal/modules/esm/loader:759:52)
+      at #resolve (node:internal/modules/esm/loader:695:17)
+      at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:615:35)
+      at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:32)
+      at TracingChannel.tracePromise (node:diagnostics_channel:350:14) {
+    code: 'ERR_MODULE_NOT_FOUND',
+    url: 'file://<repo>/apps/web/build/server/index.js'
+  }
+  
+  Node.js v25.5.0
+  
+      at ChildProcess.<anonymous> (file://<repo>/apps/web/tests/cache.test.ts:56:58)
+      at ChildProcess.emit (node:events:508:20)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+
+test at apps/web/tests/cache.test.ts:164:1
+✖ browser freshness shares the selected deadline, including slow sibling loaders (0.022875ms)
+  Error: web exited: node:internal/modules/esm/resolve:275
+      throw new ERR_MODULE_NOT_FOUND(
+            ^
+  
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<repo>/apps/web/build/server/index.js' imported from <repo>/apps/web/server.ts
+      at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+      at moduleResolve (node:internal/modules/esm/resolve:865:10)
+      at defaultResolve (node:internal/modules/esm/resolve:991:11)
+      at #cachedDefaultResolve (node:internal/modules/esm/loader:713:20)
+      at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:730:38)
+      at ModuleLoader.resolveSync (node:internal/modules/esm/loader:759:52)
+      at #resolve (node:internal/modules/esm/loader:695:17)
+      at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:615:35)
+      at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:32)
+      at TracingChannel.tracePromise (node:diagnostics_channel:350:14) {
+    code: 'ERR_MODULE_NOT_FOUND',
+    url: 'file://<repo>/apps/web/build/server/index.js'
+  }
+  
+  Node.js v25.5.0
+  
+      at ChildProcess.<anonymous> (file://<repo>/apps/web/tests/cache.test.ts:56:58)
+      at ChildProcess.emit (node:events:508:20)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+
+test at apps/web/tests/cache.test.ts:200:1
+✖ the edge may keep a page longer than browsers, which a withdrawal purge cannot reach (0.023ms)
+  Error: web exited: node:internal/modules/esm/resolve:275
+      throw new ERR_MODULE_NOT_FOUND(
+            ^
+  
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<repo>/apps/web/build/server/index.js' imported from <repo>/apps/web/server.ts
+      at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+      at moduleResolve (node:internal/modules/esm/resolve:865:10)
+      at defaultResolve (node:internal/modules/esm/resolve:991:11)
+      at #cachedDefaultResolve (node:internal/modules/esm/loader:713:20)
+      at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:730:38)
+      at ModuleLoader.resolveSync (node:internal/modules/esm/loader:759:52)
+      at #resolve (node:internal/modules/esm/loader:695:17)
+      at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:615:35)
+      at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:32)
+      at TracingChannel.tracePromise (node:diagnostics_channel:350:14) {
+    code: 'ERR_MODULE_NOT_FOUND',
+    url: 'file://<repo>/apps/web/build/server/index.js'
+  }
+  
+  Node.js v25.5.0
+  
+      at ChildProcess.<anonymous> (file://<repo>/apps/web/tests/cache.test.ts:56:58)
+      at ChildProcess.emit (node:events:508:20)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+
+test at apps/web/tests/cache.test.ts:207:1
+✖ browser caching preserves noindex and private sign-in responses (0.023292ms)
+  Error: web exited: node:internal/modules/esm/resolve:275
+      throw new ERR_MODULE_NOT_FOUND(
+            ^
+  
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<repo>/apps/web/build/server/index.js' imported from <repo>/apps/web/server.ts
+      at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+      at moduleResolve (node:internal/modules/esm/resolve:865:10)
+      at defaultResolve (node:internal/modules/esm/resolve:991:11)
+      at #cachedDefaultResolve (node:internal/modules/esm/loader:713:20)
+      at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:730:38)
+      at ModuleLoader.resolveSync (node:internal/modules/esm/loader:759:52)
+      at #resolve (node:internal/modules/esm/loader:695:17)
+      at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:615:35)
+      at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:32)
+      at TracingChannel.tracePromise (node:diagnostics_channel:350:14) {
+    code: 'ERR_MODULE_NOT_FOUND',
+    url: 'file://<repo>/apps/web/build/server/index.js'
+  }
+  
+  Node.js v25.5.0
+  
+      at ChildProcess.<anonymous> (file://<repo>/apps/web/tests/cache.test.ts:56:58)
+      at ChildProcess.emit (node:events:508:20)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+
+test at apps/web/tests/cache.test.ts:219:1
+✖ a visitor cannot name its own address to the api without a trusted proxy in front (0.035625ms)
+  Error: web exited: node:internal/modules/esm/resolve:275
+      throw new ERR_MODULE_NOT_FOUND(
+            ^
+  
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<repo>/apps/web/build/server/index.js' imported from <repo>/apps/web/server.ts
+      at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+      at moduleResolve (node:internal/modules/esm/resolve:865:10)
+      at defaultResolve (node:internal/modules/esm/resolve:991:11)
+      at #cachedDefaultResolve (node:internal/modules/esm/loader:713:20)
+      at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:730:38)
+      at ModuleLoader.resolveSync (node:internal/modules/esm/loader:759:52)
+      at #resolve (node:internal/modules/esm/loader:695:17)
+      at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:615:35)
+      at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:32)
+      at TracingChannel.tracePromise (node:diagnostics_channel:350:14) {
+    code: 'ERR_MODULE_NOT_FOUND',
+    url: 'file://<repo>/apps/web/build/server/index.js'
+  }
+  
+  Node.js v25.5.0
+  
+      at ChildProcess.<anonymous> (file://<repo>/apps/web/tests/cache.test.ts:56:58)
+      at ChildProcess.emit (node:events:508:20)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+exit=1

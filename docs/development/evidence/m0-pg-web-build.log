@@ -80,7 +80,7 @@ build/client/assets/shared-CR_fUFi-.js                51.76 kB │ gzip:  18.06 
 build/client/assets/motion-B1w0jw9O.js               127.70 kB │ gzip:  41.67 kB
 build/client/assets/entry.client-Z5GLCZeV.js         346.95 kB │ gzip: 109.54 kB
 
-✓ built in 1.65s
+✓ built in 892ms
 vite v8.3.1 building ssr environment for production...
 transforming...
 ✓ 131 modules transformed.
@@ -106,4 +106,5 @@ build/server/assets/PosterSheet-JXpDD90y.js         4.81 kB │ gzip:   1.91 kB
 build/server/assets/Presence-D1aLllrP.js           10.26 kB │ gzip:   2.50 kB
 build/server/index.js                             723.38 kB │ gzip: 178.41 kB
 
-✓ built in 559ms
+✓ built in 366ms
+exit=0
