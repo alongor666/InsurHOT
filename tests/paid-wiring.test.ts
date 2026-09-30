@@ -402,7 +402,10 @@ test("simultaneous requests under one capability limit pass exactly as many as f
   await consistent();
 });
 
-test("simultaneous requests of two services share the global limit and never exceed it together", async () => {
+// A smoke check, not the proof: each service is already serialised by its own lock, so this can pass
+// without the global money lock. That lock is proved in money.test.ts ("simultaneous reservations never
+// exceed a limit together"), where nothing else serialises the reservations.
+test("smoke: simultaneous requests of two services count against one global limit and stay within it", async () => {
   const model = `mg-${RUN}`;
   await priceRow(LLM, model, { input_per_mtok: 2, output_per_mtok: 8, output_cap_includes_reasoning: true });
   await priceRow("dajiala", "post_history", { per_request: 0.14 });

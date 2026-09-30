@@ -9,6 +9,7 @@ import { beijingDate, beijingTime } from "@aihot/contracts/time";
 import { sql } from "../db.ts";
 import { beijingDay, beijingStamp, duration, formatAlert, formatRecovery, sendAlert, type Finding, type Level } from "../notify/feishu.ts";
 import { backupConfigured } from "./backup.ts";
+import { moneyFindings } from "./money.ts";
 
 const REPEAT_MS: Record<Exclude<Level, "digest">, number> = { now: 3600_000, today: 24 * 3600_000 };
 
@@ -85,6 +86,8 @@ export async function collectFindings(now = Date.now()): Promise<Finding[]> {
 
   // ---- Money, and things only the owner can do --------------------------------------------------
   out.push(...(await providerFindings()));
+  // Monthly money limits nearly used, a price stopped by an overrun, a ledger that does not add up (ADR-015).
+  out.push(...(await moneyFindings(now)));
 
   // Content-group pushes the Feishu webhook refused (a removed bot, a changed address); nothing resends them.
   const [refused] = await sql<{ n: number; target: string | null; response: string | null }[]>`

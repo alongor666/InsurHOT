@@ -18,6 +18,7 @@ import { checkAlerts, sendDigest } from "@aihot/backend/operations/alerts";
 import { autoReleaseUnknownReceipts } from "@aihot/backend/admin/runs";
 import { forwardPendingFeedback } from "@aihot/backend/operations/feedback";
 import { backupConfigured, runBackup } from "@aihot/backend/operations/backup";
+import { runMoneyReconciliation } from "@aihot/backend/operations/money";
 import { sourceHealthWeekly } from "@aihot/backend/operations/reports";
 import { markStalePendingReceipts } from "@aihot/backend/providers/receipts";
 import { markStaleDeliveries } from "@aihot/backend/notify/deliver";
@@ -62,6 +63,8 @@ export const SCHEDULES: Scheduled[] = [
     cron: "*/10 * * * *",
     run: async () => ({ receipts: await markStalePendingReceipts(), released: await autoReleaseUnknownReceipts(), deliveries: await markStaleDeliveries() }),
   },
+  // The money ledger against what the attempts hold (ADR-015); a difference raises an alert.
+  { name: "ops.money-reconcile", cron: "50 3 * * *", missed: "once", run: () => runMoneyReconciliation() },
   { name: "ops.alerts", cron: "*/10 * * * *", run: () => checkAlerts() },
   // One message with the follow-ups that do not touch readers (nothing when there are none).
   { name: "ops.digest", cron: "0 9 * * *", missed: "once", run: () => sendDigest() },

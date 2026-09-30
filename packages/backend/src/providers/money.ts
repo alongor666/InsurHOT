@@ -57,6 +57,14 @@ export function budgetMonth(at: Date): string {
   return `${get("year")}-${get("month")}-01`;
 }
 
+/** The calendar day (YYYY-MM-DD) in the budget time zone: the date an approval carries. */
+export function budgetDay(at: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: BUDGET_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(at);
+}
+
+/** Owner input 5 of the ADR; until it is approved the proposed share is used: a limit row this full raises an alert. */
+export const MONEY_ALERT_RATIO = 0.8;
+
 // ---------------------------------------------------------------------------------------------------
 // Capability and subject
 
@@ -82,6 +90,14 @@ export function capabilityFor(service: string, purpose: string, purposes: Map<st
   if (!capability) throw new MoneyRefusedError("unmapped_purpose", `no capability for ${service} purpose "${purpose}"`);
   return capability;
 }
+
+/** Every capability a limit row can be for: the collectors, embeddings, and the model capabilities. */
+export async function knownCapabilities(): Promise<string[]> {
+  return [...new Set([...Object.values(COLLECT_SERVICES), "embedding", ...(await modelCapabilities()).values()])].sort();
+}
+
+/** The subject kinds a per-subject limit row can be for (the shapes subjectKeysFor accepts). */
+export const SUBJECT_KINDS = ["article", "report", "story"] as const;
 
 export const isModelCapability = (capability: string) => capability !== "embedding" && !capability.startsWith("collect.");
 

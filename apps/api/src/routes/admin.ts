@@ -6,6 +6,8 @@ import { actorOf } from "@aihot/backend/admin/auth";
 
 import { importSelectBenchRun, listSelectBenchRuns, selectBenchRun } from "@aihot/backend/admin/selectbench";
 import { modelsOverview, switchModel } from "@aihot/backend/admin/models";
+import { approveLimit, approvePrice, moneyOverview, releaseHeldAttempt, withdrawPrice } from "@aihot/backend/admin/money";
+import { runMoneyReconciliation } from "@aihot/backend/operations/money";
 
 import { contentChain, detachFromFact, mergeStories, overrideFields, rerun, searchContent, setSeoIndexed, setVisibility } from "@aihot/backend/admin/content";
 import { banSource, eraseFeedback, feedbackScreenshot, listFeedback, unbanSource, updateFeedback } from "@aihot/backend/admin/feedback";
@@ -106,6 +108,14 @@ export function registerAdmin(app: FastifyInstance) {
   }));
   app.put("/api/admin/budgets/:service", adminHandler(async (req, _reply, admin) => updateBudget(param(req, "service"), body(req) as never, actorOf(admin))));
 
+  // Monetary limits (ADR-015): approving a price or a limit needs the owner role (checked in the module).
+  app.get("/api/admin/money", adminHandler(async () => moneyOverview()));
+  app.put("/api/admin/money/prices", adminHandler(async (req, _reply, admin) => approvePrice(body(req) as never, admin)));
+  app.post("/api/admin/money/prices/withdraw", adminHandler(async (req, reply, admin) => orNotFound(req, reply, await withdrawPrice(body(req) as never, admin))));
+  app.put("/api/admin/money/limits", adminHandler(async (req, _reply, admin) => approveLimit(body(req) as never, admin)));
+  app.post("/api/admin/money/attempts/:id/release", adminHandler(async (req, reply, admin) =>
+    orNotFound(req, reply, await releaseHeldAttempt(Number(param(req, "id")), body(req) as never, actorOf(admin)))));
+  app.post("/api/admin/money/reconcile", adminHandler(async () => runMoneyReconciliation()));
 
   // Models and evaluation (F20)
   app.get("/api/admin/models", adminHandler(async (req) => modelsOverview(Math.min(90, Number(q(req).days) || 7))));
