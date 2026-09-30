@@ -43,7 +43,8 @@ CREATE TABLE money_usage (
   key       text NOT NULL,
   currency  text NOT NULL CHECK (currency IN ('CNY', 'USD')),
   month     date NOT NULL CHECK (extract(day FROM month) = 1),
-  amount    numeric(16, 6) NOT NULL DEFAULT 0,
+  -- Never negative: a release that would take a row below zero is a bug and must fail, not widen the limit.
+  amount    numeric(16, 6) NOT NULL DEFAULT 0 CHECK (amount >= 0),
   PRIMARY KEY (scope, key, currency, month)
 );
 
@@ -52,6 +53,7 @@ CREATE TABLE money_usage (
 -- attempt is marked failed and may still hold its money).
 ALTER TABLE receipt_attempts
   ADD COLUMN capability text,
+  ADD COLUMN price_service text,
   ADD COLUMN price_key text,
   ADD COLUMN subject_keys text[] NOT NULL DEFAULT '{}',
   ADD COLUMN budget_month date,
@@ -60,7 +62,7 @@ ALTER TABLE receipt_attempts
   ADD COLUMN settled_amount numeric(14, 6) CHECK (settled_amount >= 0),
   ADD COLUMN holds_reservation boolean NOT NULL DEFAULT false,
   ADD CONSTRAINT receipt_attempts_reservation_complete CHECK (
-    NOT holds_reservation OR (capability IS NOT NULL AND price_key IS NOT NULL AND budget_month IS NOT NULL
+    NOT holds_reservation OR (capability IS NOT NULL AND price_service IS NOT NULL AND price_key IS NOT NULL AND budget_month IS NOT NULL
       AND reserved_amount IS NOT NULL AND reserved_currency IS NOT NULL));
 
 CREATE INDEX receipt_attempts_money_idx ON receipt_attempts (reserved_currency, budget_month) WHERE holds_reservation;
