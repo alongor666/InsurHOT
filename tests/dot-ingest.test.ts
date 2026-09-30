@@ -67,10 +67,13 @@ test('overall cap holds when a client rotates forged X-Forwarded-For under trust
   const repo = new FakeRepository();
   const app = Fastify({ logger: false, trustProxy: true });
   registerDotIngest(app, { env: () => ({ DOT_INGEST_ENABLED: 'true', DOT_INGEST_TOKEN: token }), service: new DotIntakeService(repo, () => new Date(time)) });
-  const post = (n: number) => app.inject({ method: 'POST', url: '/api/ingest/dot', payload: payload(), headers: { authorization: 'Bearer wrong', 'x-forwarded-for': `203.0.113.${n % 250}, 10.1.${Math.floor(n / 250)}.1` }, remoteAddress: '10.0.0.9' });
+  // Every request carries a distinct forged client address, so only the overall cap can stop them.
+  const post = (n: number) => app.inject({ method: 'POST', url: '/api/ingest/dot', payload: payload(), headers: { authorization: 'Bearer wrong', 'x-forwarded-for': `10.${Math.floor(n / 65536) % 256}.${Math.floor(n / 256) % 256}.${n % 256}, 10.1.1.1` }, remoteAddress: '10.0.0.9' });
   try {
     for (let n = 0; n < DOT_RATE_LIMIT.overall; n++) assert.equal((await post(n)).statusCode, 401, `request ${n}`);
     assert.equal((await post(DOT_RATE_LIMIT.overall)).statusCode, 429);
+    // Flooding past the address-map bound clears that map but must not reset the overall window.
+    for (let n = DOT_RATE_LIMIT.overall + 1; n < DOT_RATE_LIMIT.maxAddresses + 50; n++) assert.equal((await post(n)).statusCode, 429, `request ${n}`);
     assert.equal(repo.calls, 0);
   } finally { await app.close(); }
 });

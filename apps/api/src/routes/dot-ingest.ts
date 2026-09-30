@@ -12,23 +12,26 @@ function authorized(header: string | undefined, expected: string | undefined): b
   const digest = (value: string) => createHash('sha256').update(value).digest();
   return timingSafeEqual(digest(given), digest(expected));
 }
-// Counted before authentication so token guessing and bulk retries are both bounded. Like the admin login
-// limiter: a per-address cap plus an overall cap that still holds when a client forges its address
-// (trustProxy takes the client-controlled X-Forwarded-For), and a hard clear() bounding the map. State
-// lives with the app instance, so a restart only relaxes it.
-export const DOT_RATE_LIMIT = { perAddress: 60, overall: 300, windowMs: 60_000 };
+// Counted before authentication so token guessing and bulk retries are both bounded: a per-address cap
+// plus an overall cap that still holds when a client forges its address (trustProxy takes the
+// client-controlled X-Forwarded-For). The overall window lives outside the address map, so clearing the
+// map when forged addresses flood it never resets the overall count. Once over a limit, no more
+// timestamps are kept, so a window holds at most limit + 1 entries. State lives with the app instance.
+export const DOT_RATE_LIMIT = { perAddress: 60, overall: 300, windowMs: 60_000, maxAddresses: 5000 };
 function rateLimiter() {
-  const recent = new Map<string, number[]>();
-  const over = (key: string, limit: number, now: number): boolean => {
-    const list = (recent.get(key) ?? []).filter((t) => now - t < DOT_RATE_LIMIT.windowMs);
-    list.push(now);
-    recent.set(key, list);
-    return list.length > limit;
+  const byAddress = new Map<string, number[]>();
+  let overall: number[] = [];
+  const over = (list: number[], limit: number, now: number): number[] => {
+    const live = list.filter((t) => now - t < DOT_RATE_LIMIT.windowMs);
+    if (live.length <= limit) live.push(now);
+    return live;
   };
   return (address: string, now = Date.now()): boolean => {
-    if (recent.size > 5000) recent.clear();
-    const perAddress = over(`ip:${address}`, DOT_RATE_LIMIT.perAddress, now);
-    return over('all', DOT_RATE_LIMIT.overall, now) || perAddress;
+    if (byAddress.size > DOT_RATE_LIMIT.maxAddresses) byAddress.clear();
+    const mine = over(byAddress.get(address) ?? [], DOT_RATE_LIMIT.perAddress, now);
+    byAddress.set(address, mine);
+    overall = over(overall, DOT_RATE_LIMIT.overall, now);
+    return overall.length > DOT_RATE_LIMIT.overall || mine.length > DOT_RATE_LIMIT.perAddress;
   };
 }
 export function registerDotIngest(app: FastifyInstance, options: DotRouteOptions = {}) {
