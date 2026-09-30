@@ -268,6 +268,33 @@ export function perUnitWorstCase(price: ApprovedPrice): number {
 }
 
 // ---------------------------------------------------------------------------------------------------
+// Actual cost from what the provider reports
+
+const count = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
+
+/**
+ * What a token-billed answer cost at this row's prices, from an OpenAI-style usage object; null when
+ * the usage does not say. Output is what the usage counts beyond the prompt, so reasoning tokens a
+ * provider reports only in total_tokens are still paid for at the output price. Cached input is
+ * counted at the full input price.
+ */
+export function tokenCost(price: ApprovedPrice, usage: Record<string, unknown> | null | undefined): number | null {
+  if (!usage || price.inputPerMtok === null) return null;
+  const prompt = count(usage.prompt_tokens), completion = count(usage.completion_tokens), total = count(usage.total_tokens);
+  if (prompt === null) return null;
+  const output = Math.max(completion ?? 0, total !== null ? total - prompt : 0);
+  if (output > 0 && price.outputPerMtok === null) return null;
+  if (completion === null && total === null) return null;
+  return ceilMicro((prompt * price.inputPerMtok + output * (price.outputPerMtok ?? 0)) / 1e6);
+}
+
+/** What a request billed by what it returned cost at this row's unit price; null when the count is unknown. */
+export function unitCost(price: ApprovedPrice, units: unknown): number | null {
+  const n = count(units);
+  return n === null || price.perUnit === null ? null : ceilMicro(n * price.perUnit);
+}
+
+// ---------------------------------------------------------------------------------------------------
 // Reservation, settlement, ledger
 
 export interface Reservation {
